@@ -75,7 +75,12 @@
         ]
     },
     "IDF": {
-        "keywords": [ ],
+        "keywords": ["cod fata"],
+        "priority": [
+            "cod fata",
+            "cod-fata",
+            "front code"
+        ],
         "avoid": []
     },
     "Panel type": {
@@ -85,6 +90,7 @@
         "tipul"
     ],
         "priority": [
+        "tip",
         "tip panou",
         "panel type",
         "type of panel"
@@ -165,7 +171,8 @@
             "de la",
             "start campanie",
             "start date",
-            "disponibil"
+            "disponibil",
+            "incepe"
         ],
         "priority": [],
         "avoid": []
@@ -179,7 +186,8 @@
             "pana la",
             "sfarsit campanie",
             "end date",
-            "disponibil"
+            "disponibil",
+            "sfarseste"
         ],
         "priority": [],
         "avoid": ["ora", "ore"]

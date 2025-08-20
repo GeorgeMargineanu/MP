@@ -149,7 +149,56 @@ class DataProcessor:
             "Height": f"{height}m" if height else None,
             "Size": size if size else None
         })
+    
 
+    
+    def process_dates(self, df):
+        # Beforehand convert them to datetime
+            df["Start"] = df["Start"].apply(self._safe_to_date)
+            df["End"]   = df["End"].apply(self._safe_to_date)
+            return df
+    
+    @staticmethod
+    def check_if_weird_date(value):
+        pattern = r'^\d{1,2}\s+\w+\s*-\s*\d{1,2}\s+\w+$'
+        return bool(re.match(pattern, str(value).strip(), re.IGNORECASE))
+    
+    @staticmethod
+    def split_weird_date(value):
+        # Split on "-" and strip spaces
+        dates_splitted = [d.strip() for d in str(value).split('-')]
+        if len(dates_splitted) == 2:
+            return dates_splitted
+        return [None, None]
+
+    def deal_with_weird_dates(self, df):
+        # Create new Start and End
+        new_dates = df["Start"].apply(
+            lambda x: self.split_weird_date(x) if self.check_if_weird_date(x) else [x, None]
+        )
+        df[["Start", "End"]] = pd.DataFrame(new_dates.tolist(), index=df.index)
+        return df
+                
+    @staticmethod
+    def _safe_to_date(value):
+        try:
+            dt = pd.to_datetime(value, dayfirst=True, errors="raise")  # raise if cannot parse
+            return dt.strftime("%Y-%m-%d")
+        except Exception:
+            return value  
+
+    @staticmethod
+    def calculate_no_of_months(row):
+        try:
+            start = pd.to_datetime(row["Start"], errors="coerce")
+            end = pd.to_datetime(row["End"], errors="coerce")
+            if pd.isna(start) or pd.isna(end):
+                return None
+            delta_days = (end - start).days
+            return round(delta_days / 30, 1)
+        except Exception:
+            return None
+        
     @staticmethod
     def build_gps_from_lat_long(row):
         latitude = row.get("Latitude")
@@ -182,8 +231,11 @@ class DataProcessor:
         final_df = self.remove_empty_columns(final_df, excepted_columns="__source_file")
         final_df[["Base", "Height", "Size"]] = final_df.apply(self.process_size_base_height, axis=1)
         final_df["GPS"] = final_df.apply(self.build_gps_from_lat_long, axis=1)
-        return final_df
+        final_df = self.process_dates(final_df)
+        final_df = self.deal_with_weird_dates(final_df)
+        final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
 
+        return final_df
 
 if __name__ == "__main__":
     directory = r'\\unm-srv-nor\WorkFolders\Others\_NON TV\CORE\OFERTE FURNIZORI OOH\Facute'

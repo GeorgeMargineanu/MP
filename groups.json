@@ -1,0 +1,338 @@
+{
+    "County": {
+        "keywords": [
+            "jude",
+            "county",
+            "jud"
+            ],
+        "priority": [
+            "jud",
+            "judet",
+            "jude",
+            "county"
+            ],
+        "avoid": []
+    },
+    "Local": {
+        "keywords": [
+            "localitate",
+            "locali",
+            "district",
+            "oras",
+            "city",
+            "municipality",
+            "sector"
+            ],
+        "priority": [
+            "localitate",
+            "oras",
+            "city",
+            "sector"
+        ],
+        "avoid": [
+            "cod",
+            "id",
+            "idx"
+        ]
+    },
+    "Address": {
+        "keywords": [
+            "address",
+            "adresa",
+            "locatie",
+            "location"
+            ],
+        "priority": [
+            "adresa",
+            "address",
+            "face description"
+            ],
+        "avoid": [
+            "cod locatie",
+            "cod loc",
+            "cod",
+            "id",
+            "idx",
+            "fata"
+        ]
+    },
+    "ID": {
+        "keywords": [
+            "cod-locatie",
+            "cod", 
+            "cod intern",
+            "cod-intern",
+            "id",
+            "code"
+            ],
+        "priority": [
+            "cod-locatie",
+            "cod locatie"
+        ],
+        "avoid": [
+            "cod fata",
+            "front code"
+        ]
+    },
+    "IDF": {
+        "keywords": [ ],
+        "avoid": []
+    },
+    "Panel type": {
+        "keywords": [
+        "panou",
+        "panel",
+        "tipul"
+    ],
+        "priority": [
+        "tip panou",
+        "panel type",
+        "type of panel"
+    ],
+        "avoid": [
+        "cod panou"
+    ]
+    },
+    "Format": {
+        "keywords": [
+        "format"
+    ],
+        "priority": [
+        "format"
+    ],
+        "avoid": []
+    },
+    "Base": {
+        "keywords": [
+            "latime",
+            "base",
+            "width",
+            "dim"
+        ],
+        "priority": [
+            "latime",
+            "width",
+            "B"
+        ],
+        "avoid": [
+            "weekly base impacts"
+        ]
+    },
+    "Size": {
+        "keywords": [
+            "size",
+            "dimensiune",
+            "dimensiuni",
+            "dim"
+        ],
+        "priority": [
+            "dimensiuni",
+            "dimensiune",
+            "size"
+        ],
+        "avoid": []
+    },
+    "Height": {
+        "keywords": [
+            "inaltime",
+            "height"
+        ],
+        "priority": [
+            "inaltime",
+            "height",
+            "H"
+        ],
+        "avoid": []
+    },
+    "Faces": {
+        "keywords": [
+            "fete",
+            "faces",
+            "faces"
+        ],
+        "priority": [
+            "fete",
+            "faces",
+            "faces"
+        ],
+        "avoid": []
+    },
+    "Start": {
+        "keywords": [
+            "start",
+            "inceput",
+            "data start",
+            "de la",
+            "start campanie",
+            "start date",
+            "disponibil"
+        ],
+        "priority": [],
+        "avoid": []
+    },
+    "End": {
+        "keywords": [
+            "stop",
+            "end",
+            "sfarsit",
+            "data sfarsit",
+            "pana la",
+            "sfarsit campanie",
+            "end date",
+            "disponibil"
+        ],
+        "priority": [],
+        "avoid": ["ora", "ore"]
+    },
+    "No. of months":{
+        "keywords": [],
+        "avoid":[]
+    },
+    "Photo Link": {
+        "keywords": [
+            "poza",
+            "photo",
+            "link poza",
+            "foto",
+            "link foto",
+            "imagini",
+            "picture",
+            "catalog",
+            "photo/video"
+        ],
+        "priority": [
+            "link",
+            "foto",
+            "poza",
+            "picture"
+        ],
+        "avoid": [
+            "schita",
+            "map"
+        ]
+    },
+    "GPS": {
+        "keywords": [
+            "gps",
+            "coordonate gps",
+            "coordonate",
+            "longitude/latitude",
+            "gps-n",
+            "gps-e"
+        ],
+        "priority": [
+            "gps",
+            "coordinates",
+            "coordonate",
+            "gps coordinates",
+            "coordonate gps"
+        ],
+        "avoid": [
+            "schita",
+            "map"
+        ]
+    },
+    "Latitude":{
+        "keywords": [
+            "latitude",
+            "lat",
+            "latitudine"
+        ],
+        "avoid":[
+            "latime"
+        ]
+    },
+    "Longitude":{
+        "keywords": [
+            "longitude",
+            "long",
+            "longitudine"
+        ]
+    },
+    "Sketch name":{
+        "keywords": ["sketch", "schita"],
+        "priority": ["sketch name", "sketch details", "nume schita", "numele schitei", "detalii schita"]
+    },
+    "Tech details":{
+        "keywords": []
+    },
+    "idx":{
+        "keywords": ["idx"],    
+        "priority": ["idx"]
+    },
+    "Nume furnizor":{
+        "keywords": []
+    },
+    "Chirie Furnizor": {
+        "keywords": [
+            "chirie",
+            "pret chirie",
+            "chirie lunara",
+            "cost chirie",
+            "rate card",
+            "price",
+            "rent",
+            "total luna",
+            "price/2 weeks",
+            "price/31 days",
+            "price/campaign period"
+        ],
+        "priority": [
+            "chirie",
+            "pret chirie",
+            "chirie lunara",
+            "cost chirie",
+            "rent",
+            "montly rent"
+        ],
+        "avoid": [
+            "decorare",
+            "iluminare",
+            "taxa"
+        ]
+    },
+    "Postare furnizor":{
+        "keywords": []
+    },
+    "Cost productie": {
+        "keywords": [
+            "productie",
+            "cost productie",
+            "production",
+            "production cost",
+            "posting",
+            "price production"
+        ],
+        "priority": [
+            "productie",
+            "cost productie",
+            "production"
+        ],
+        "avoid": [
+            "decorare",
+            "chirie",
+            "rent",
+            "iluminare",
+            "taxa"
+        ]
+    },
+    "Tip material": {
+        "keywords": [
+            "tip material",
+            "tip suport",
+            "material type",
+            "support type"
+        ],
+        "priority": [
+            "tip material",
+            "tip suport"
+        ],
+        "avoid": [
+            "productie",
+            "chirie",
+            "decorare",
+            "iluminare",
+            "taxa"
+        ]
+    }
+}

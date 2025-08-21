@@ -3,7 +3,6 @@ import glob
 import os
 import re
 import unicodedata
-import json
 import numpy as np
 import datetime
 
@@ -76,16 +75,28 @@ class ColumnMatcher:
 
 
 class DataProcessor:
-    def __init__(self, groups, directory):
+    def __init__(self, groups, directory=None):
         self.groups = groups
         self.directory = directory
 
-    def extract_standardized_dataframe(self, file_path):
-        file_name = os.path.basename(file_path)
-        print(f'Processing file: {file_name}')
+    def extract_standardized_dataframe(self, file_input, file_name=None):
+        """
+        file_input can be:
+        - a string path
+        - a file-like object (BytesIO)
+        file_name is optional (used for labelling source when file_input is a buffer)
+        """
+        if isinstance(file_input, (str, bytes, os.PathLike)):
+            file_name = os.path.basename(file_input)
+            read_target = file_input
+        else:
+            # assume file-like
+            read_target = file_input
+            if file_name is None:
+                file_name = "uploaded_file.xlsx"
 
         try:
-            raw_data = pd.read_excel(file_path, sheet_name=0, header=None, engine='openpyxl')
+            raw_data = pd.read_excel(read_target, sheet_name=0, header=None, engine="openpyxl")
         except Exception as e:
             print(f"Failed to read {file_name}: {e}")
             return pd.DataFrame()
@@ -97,12 +108,10 @@ class DataProcessor:
                 break
 
         if header_row_index is None:
-            print(f"No suitable header found in {file_name}")
             return pd.DataFrame()
 
-        df = pd.read_excel(file_path, sheet_name=0, header=header_row_index, engine='openpyxl')
+        df = pd.read_excel(read_target, sheet_name=0, header=header_row_index, engine="openpyxl")
         columns = df.columns
-        print(f'Cols are {columns}')
 
         extracted = pd.DataFrame()
         for name, cfg in self.groups.items():
@@ -150,22 +159,19 @@ class DataProcessor:
             "Height": f"{height}m" if height else None,
             "Size": size if size else None
         })
-    
+
     def process_dates(self, df):
-        # Beforehand convert them to datetime
-            df["Start"] = df["Start"].apply(self._safe_to_date)
-            df["End"]   = df["End"].apply(self._safe_to_date)
-            return df
-    
+        df["Start"] = df["Start"].apply(self._safe_to_date)
+        df["End"]   = df["End"].apply(self._safe_to_date)
+        return df
+
     @staticmethod
     def check_if_literal_date(value):
-        # 01 sept - 31 oct
         pattern = r'^\d{1,2}\s+\w+\s*-\s*\d{1,2}\s+\w+$'
         return bool(re.match(pattern, str(value).strip(), re.IGNORECASE))
-    
+
     @staticmethod
     def split_literal_date(value):
-        # Split on "-" and strip spaces
         dates_splitted = [" ".join((d.strip(), str(datetime.datetime.now().year)))
                           for d in str(value).split('-')]
         if len(dates_splitted) == 2:
@@ -185,11 +191,11 @@ class DataProcessor:
             axis=1
         )
         return df
-                    
+
     @staticmethod
     def _safe_to_date(value):
         try:
-            dt = pd.to_datetime(value, dayfirst=True, errors="raise")  # raise if cannot parse
+            dt = pd.to_datetime(value, dayfirst=True, errors="raise")
             return dt.strftime("%Y-%m-%d")
         except Exception:
             return value  
@@ -205,7 +211,7 @@ class DataProcessor:
             return round(delta_days / 30, 1)
         except Exception:
             return None
-        
+
     @staticmethod
     def build_gps_from_lat_long(row):
         latitude = row.get("Latitude")
@@ -218,15 +224,10 @@ class DataProcessor:
             return f"{latitude}, {longitude}"
         return None
 
-    def process_all_files(self):
-        correct_files = [
-            file for file in glob.glob(os.path.join(self.directory, '*'))
-            if os.path.isfile(file) and (file.endswith('.xlsx') or file.endswith('.csv'))
-        ]
-
+    def process_files(self, file_objs):
         all_data = []
-        for file in correct_files:
-            extracted = self.extract_standardized_dataframe(file)
+        for file_input, file_name in file_objs:
+            extracted = self.extract_standardized_dataframe(file_input, file_name=file_name)
             if not extracted.empty:
                 all_data.append(extracted)
 
@@ -239,16 +240,7 @@ class DataProcessor:
         final_df[["Base", "Height", "Size"]] = final_df.apply(self.process_size_base_height, axis=1)
         final_df["GPS"] = final_df.apply(self.build_gps_from_lat_long, axis=1)
         final_df = self.process_dates(final_df)
-        final_df = self.deal_with_literal_dates(final_df) # For weird dates without year cannot compute the No. of months column.
+        final_df = self.deal_with_literal_dates(final_df)
         final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
 
         return final_df
-
-if __name__ == "__main__":
-    directory = r'\\unm-srv-nor\WorkFolders\Others\_NON TV\CORE\OFERTE FURNIZORI OOH\Facute'
-    with open('groups.json', 'r') as file:
-        groups = json.load(file)
-
-    processor = DataProcessor(groups, directory)
-    final_df = processor.process_all_files()
-    final_df.to_excel("test.xlsx", index=False)

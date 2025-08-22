@@ -200,6 +200,7 @@
         "keywords": [
             "poza",
             "photo",
+            "schita",
             "link poza",
             "foto",
             "link foto",
@@ -209,10 +210,17 @@
             "photo/video"
         ],
         "priority": [
+            "schita",
             "link",
             "foto",
+            "imagine",
             "poza",
-            "picture"
+            "picture",
+            "sketch",
+            "pagina prezentare",
+            "schita productie",
+            "google map",
+            "photo"
         ],
         "avoid": [
             "schita",

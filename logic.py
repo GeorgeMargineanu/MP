@@ -5,6 +5,7 @@ import re
 import unicodedata
 import numpy as np
 import datetime
+from openpyxl import load_workbook
 
 class TextUtils:
     @staticmethod
@@ -79,6 +80,27 @@ class DataProcessor:
         self.groups = groups
         self.directory = directory
 
+
+    @staticmethod
+    def extract_hyperlinks(file_input):
+        """
+        Returns a dict mapping (row_idx, col_idx) -> hyperlink URL
+        row_idx, col_idx are 0-based to match pandas indexing.
+        """
+        if hasattr(file_input, "seek"):  # BytesIO case
+            file_input.seek(0)
+        wb = load_workbook(file_input, data_only=True)
+        ws = wb.active
+
+        links = {}
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.hyperlink:
+                    # openpyxl row/column are 1-based, convert to 0-based
+                    links[(cell.row - 1, cell.column - 1)] = cell.hyperlink.target
+        return links
+    
+
     def extract_standardized_dataframe(self, file_input, file_name=None):
         """
         file_input can be:
@@ -90,12 +112,14 @@ class DataProcessor:
             file_name = os.path.basename(file_input)
             read_target = file_input
         else:
-            # assume file-like
-            read_target = file_input
+            read_target = file_input  # assume file-like
             if file_name is None:
                 file_name = "uploaded_file.xlsx"
 
+        # read once without headers to find header row
         try:
+            if hasattr(read_target, "seek"):
+                read_target.seek(0)
             raw_data = pd.read_excel(read_target, sheet_name=0, header=None, engine="openpyxl")
         except Exception as e:
             print(f"Failed to read {file_name}: {e}")
@@ -103,15 +127,23 @@ class DataProcessor:
 
         header_row_index = None
         for i, row in raw_data.iterrows():
-            if row.count() >= 9:
+            if row.count() >= 9:  # your heuristic for header
                 header_row_index = i
                 break
 
         if header_row_index is None:
             return pd.DataFrame()
 
+        # read again with correct header row
+        if hasattr(read_target, "seek"):
+            read_target.seek(0)
         df = pd.read_excel(read_target, sheet_name=0, header=header_row_index, engine="openpyxl")
         columns = df.columns
+
+        # also load hyperlinks with openpyxl
+        if hasattr(read_target, "seek"):
+            read_target.seek(0)
+        hyperlinks = self.extract_hyperlinks(read_target)
 
         extracted = pd.DataFrame()
         for name, cfg in self.groups.items():
@@ -121,7 +153,21 @@ class DataProcessor:
                 priority=cfg.get("priority", []),
                 avoid=cfg.get("avoid", [])
             )
-            extracted[name] = df[best] if best else ""
+
+            if best:
+                extracted[name] = df[best]
+
+                # special handling: if it's a photo link column, replace text with hyperlink
+                if name.lower() in ["photo link", "photo", "link foto", "poza", "picture", "schita", "link",  
+                                    "foto","imagine", "poza",  "picture",  "sketch", "pagina prezentare",  "schita productie","google map","photo", "google maps"]:
+                                
+                    col_idx = list(columns).index(best)
+                    for row_idx in range(len(df)):
+                        excel_row_idx = row_idx + header_row_index + 1  # adjust for skipped rows
+                        if (excel_row_idx, col_idx) in hyperlinks:
+                            extracted.at[row_idx, name] = hyperlinks[(excel_row_idx, col_idx)]
+            else:
+                extracted[name] = ""
 
         extracted["__source_file"] = file_name
         return extracted

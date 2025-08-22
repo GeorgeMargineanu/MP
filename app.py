@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.sidebar.image("static/images/logo.png", width=120 )  
+st.sidebar.image("static/images/logo.png", width=120)  
 
 st.title("MP Data Processor")
 st.caption(
@@ -28,13 +28,23 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-if groups_file and uploaded_files:
+# 🔹 Initialize session_state storage
+if "final_df" not in st.session_state:
+    st.session_state.final_df = None
+if "file_objs" not in st.session_state:
+    st.session_state.file_objs = []
+
+@st.cache_data
+def _read_csv(uploaded_file):
+    return pd.read_csv(uploaded_file)
+
+if groups_file and uploaded_files and st.session_state.final_df is None:
     groups = json.load(groups_file)
 
     file_objs = []
     for uploaded_file in uploaded_files:
         if uploaded_file.type == "text/csv" or uploaded_file.name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
+            df = _read_csv(uploaded_file)
             buffer = io.BytesIO()
             df.to_excel(buffer, index=False, engine="openpyxl")
             buffer.seek(0)
@@ -61,34 +71,40 @@ if groups_file and uploaded_files:
     status_placeholder.success("Processing complete!")
 
     if all_results:
-        final_df = pd.concat(all_results, ignore_index=True)
-
-        tab1, tab2, tab3 = st.tabs(["🔍 Preview", "📥 Download", "📈 Summary"])
-
-        with tab1:
-            st.write("Here’s a preview of your processed dataset:")
-            st.dataframe(final_df.head(50), use_container_width=True)
-
-        with tab2:
-            output_buffer = io.BytesIO()
-            final_df.to_excel(output_buffer, index=False, engine="openpyxl")
-            output_buffer.seek(0) 
-
-            st.download_button(
-                label="Download Excel",
-                data=output_buffer,
-                file_name="processed_output.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-
-        with tab3:
-            st.write("### Quick Summary")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("📂 Files Processed", len(file_objs))
-            col2.metric("📊 Rows Combined", len(final_df))
-            col3.metric("🧾 Columns Detected", len(final_df.columns))
+        st.session_state.final_df = pd.concat(all_results, ignore_index=True)
+        st.session_state.file_objs = file_objs
     else:
         st.warning(" No data could be extracted.")
+
+# 🔹 Display if already processed
+if st.session_state.final_df is not None:
+    final_df = st.session_state.final_df
+    file_objs = st.session_state.file_objs
+
+    tab1, tab2, tab3 = st.tabs(["🔍 Preview", "📥 Download", "📈 Summary"])
+
+    with tab1:
+        st.write("Here’s a preview of your processed dataset:")
+        st.dataframe(final_df.head(50), use_container_width=True)
+
+    with tab2:
+        output_buffer = io.BytesIO()
+        final_df.to_excel(output_buffer, index=False, engine="openpyxl")
+        output_buffer.seek(0) 
+
+        st.download_button(
+            label="Download Excel",
+            data=output_buffer,
+            file_name="processed_output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+    with tab3:
+        st.write("### Quick Summary")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("📂 Files Processed", len(file_objs))
+        col2.metric("📊 Rows Combined", len(final_df))
+        col3.metric("🧾 Columns Detected", len(final_df.columns))
 else:
     st.info("⬅ Please upload a `groups.json` file and at least one Excel/CSV file to begin.")

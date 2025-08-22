@@ -84,8 +84,15 @@ if st.session_state.final_df is not None:
     tab1, tab2, tab3 = st.tabs(["🔍 Preview", "📥 Download", "📈 Summary"])
 
     with tab1:
-        st.write("Here’s a preview of your processed dataset:")
-        st.dataframe(final_df.head(50), use_container_width=True)
+        st.sidebar.markdown('-----------------')
+        options = final_df["__source_file"].unique()
+
+        select_provider = st.sidebar.selectbox("Select the provider",
+                                               options=options)
+        
+        st.write("🔍 Summary for the selected provider :")
+        final_df = final_df[final_df["__source_file"] == select_provider]
+        st.dataframe(final_df, use_container_width=True)
 
     with tab2:
         output_buffer = io.BytesIO()
@@ -108,3 +115,6 @@ if st.session_state.final_df is not None:
         col3.metric("🧾 Columns Detected", len(final_df.columns))
 else:
     st.info("⬅ Please upload a `groups.json` file and at least one Excel/CSV file to begin.")
+
+
+

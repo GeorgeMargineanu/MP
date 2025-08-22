@@ -341,14 +341,16 @@
         ],
         "priority": [
             "tip material",
-            "tip suport"
+            "tip format",
+            "tip panou"
         ],
         "avoid": [
             "productie",
             "chirie",
             "decorare",
             "iluminare",
-            "taxa"
+            "taxa",
+            "tip suport"
         ]
     }
 }

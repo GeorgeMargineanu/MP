@@ -4,6 +4,8 @@ import json
 import io
 import time
 from logic import DataProcessor
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 st.set_page_config(
     page_title="Data Processor",
@@ -91,12 +93,38 @@ if st.session_state.final_df is not None:
                                                options=options)
         
         st.write("🔍 Summary for the selected provider :")
-        final_df = final_df[final_df["__source_file"] == select_provider]
+        df_per_company = final_df[final_df["__source_file"] == select_provider]
         st.dataframe(final_df, use_container_width=True)
 
     with tab2:
         output_buffer = io.BytesIO()
-        final_df.to_excel(output_buffer, index=False, engine="openpyxl")
+        with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+            final_df.to_excel(writer, index=False, sheet_name="Processed Data")
+
+            workbook = writer.book
+            worksheet = writer.sheets["Processed Data"]
+
+            # style header
+            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True)
+
+            for col_num, col_name in enumerate(final_df.columns, 1):
+                cell = worksheet.cell(row=1, column=col_num)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            # auto column width, wrap text, zebra striping
+            for col_num, col_name in enumerate(final_df.columns, 1):
+                col_letter = get_column_letter(col_num)
+                max_length = max(final_df[col_name].astype(str).map(len).max(), len(col_name)) + 2
+                worksheet.column_dimensions[col_letter].width = max_length
+                for row_idx, row in enumerate(worksheet[col_letter], start=1):
+                    row.alignment = Alignment(wrap_text=True, vertical="top")
+                    if row_idx > 1:  # zebra striping, skip header
+                        if row_idx % 2 == 0:
+                            row.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
         output_buffer.seek(0) 
 
         st.download_button(
@@ -115,6 +143,3 @@ if st.session_state.final_df is not None:
         col3.metric("🧾 Columns Detected", len(final_df.columns))
 else:
     st.info("⬅ Please upload a `groups.json` file and at least one Excel/CSV file to begin.")
-
-
-

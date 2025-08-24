@@ -220,7 +220,8 @@
             "pagina prezentare",
             "schita productie",
             "google map",
-            "photo"
+            "photo",
+            "photo & map link"
         ],
         "avoid": [
             "schita",

@@ -1,27 +1,36 @@
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.drawing.image import Image as XLImage
 import pandas as pd
 import io
 
 def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
     """
     Exports a styled Excel file:
-    - Title row merged across first 2 columns
-    - Metadata rows: Brand, Campaign, Version, Start, End
+    - Inserts image at D2
+    - Metadata rows: Brand, Campaign, Version, Start, End (A2:B6)
     - DataFrame starting from row 10
-    - Hyperlinks in columns detected from groups.json
+    - Hyperlinks automatically styled
     """
-    from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-    from openpyxl.utils import get_column_letter
-    import io
-
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+        # Write DataFrame starting at row 10
         df.to_excel(writer, index=False, sheet_name="Processed Data", startrow=9)
         workbook = writer.book
         worksheet = writer.sheets["Processed Data"]
 
-        # Styles
+        # --- Insert Image ---
+        image_path = "static/images/for_excel_output.png"
+        try:
+            img = XLImage(image_path)
+            img.anchor = "D2"
+            img.height = img.height / 2
+            img.width = img.width / 2
+            worksheet.add_image(img)
+        except Exception as e:
+            print(f"Could not insert image: {e}")
+
+        # --- Styles ---
         title_font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
         header_font_white = Font(name="Calibri", size=9, color="FFFFFF", bold=True)
         header_font_red = Font(name="Calibri", size=9, color="FF0000", bold=True)
@@ -48,18 +57,16 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         }
 
         max_col_width = 40
-        n_cols = df.shape[1]
 
-        # --- Title Row (Row 1) ---
-        merge_cols = 2
-        worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=merge_cols)
+        # --- Title Row ---
+        worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2)
         cell = worksheet.cell(row=1, column=1)
         cell.value = "MP OOH CAMPAIGN"
         cell.font = title_font
         cell.fill = title_fill
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # --- Metadata Rows (Rows 2-6) ---
+        # --- Metadata Rows (A2:B6) ---
         meta_fields = ["Brand", "Campaign", "Version", "Start", "End"]
         for i, field in enumerate(meta_fields, start=2):
             worksheet.cell(row=i, column=1, value=field).font = Font(bold=True, name="Calibri", size=9)

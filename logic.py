@@ -175,7 +175,7 @@ class DataProcessor:
     @staticmethod
     def remove_empty_columns(df, excepted_columns):
         cols_to_check = [col for col in df.columns if col != excepted_columns]
-        df = df.replace(r'^\s*$', np.nan, regex=True)
+        df = df.replace(r'^\s*$', np.nan, regex=True).infer_objects(copy=False)
         return df.dropna(how="all", subset=cols_to_check)
 
     @staticmethod
@@ -288,13 +288,13 @@ class DataProcessor:
         final_df = self.process_dates(final_df)
         final_df = self.deal_with_literal_dates(final_df)
         final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
-        final_df["Nume furnizor"] = (
-        final_df["__source_file"]
-            .astype(str)                        
-            .str.strip()                          
-            .str.replace(r"\.xlsx$", "", regex=True, case=False)  
-            .str.rstrip("-")
-            .str.strip()                         
-        )
+        final_df["Nume furnizor"] = (final_df["__source_file"]
+                .astype(str)                        
+                .str.strip()                          
+                .str.replace(r"\.xlsx$", "", regex=True, case=False)  
+                .str.rstrip("-")
+                .str.strip()                         
+            )
+        final_df = final_df.drop(columns=["Latitude", "Longitude"])
 
         return final_df

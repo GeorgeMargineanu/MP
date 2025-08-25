@@ -94,7 +94,7 @@ if st.session_state.final_df is not None:
         
         st.write("🔍 Summary for the selected provider :")
         df_per_company = final_df[final_df["__source_file"] == select_provider]
-        st.dataframe(final_df, use_container_width=True)
+        st.dataframe(df_per_company, use_container_width=True)
 
     with tab2:
         output_buffer = io.BytesIO()
@@ -114,11 +114,13 @@ if st.session_state.final_df is not None:
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
+            max_col_width = 40
             # auto column width, wrap text, zebra striping
             for col_num, col_name in enumerate(final_df.columns, 1):
                 col_letter = get_column_letter(col_num)
                 max_length = max(final_df[col_name].astype(str).map(len).max(), len(col_name)) + 2
-                worksheet.column_dimensions[col_letter].width = max_length
+                worksheet.column_dimensions[col_letter].width = min(max_length, max_col_width)
+
                 for row_idx, row in enumerate(worksheet[col_letter], start=1):
                     row.alignment = Alignment(wrap_text=True, vertical="top")
                     if row_idx > 1:  # zebra striping, skip header

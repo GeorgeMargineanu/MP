@@ -1,5 +1,4 @@
 import pandas as pd
-import glob
 import os
 import re
 import unicodedata
@@ -77,44 +76,55 @@ class ColumnMatcher:
 
 
 class DataProcessor:
-    # all possible hyperlink-bearing columns (normalized)
-    HYPERLINK_COLUMNS = {
-        "link poza", "catalog", "cod", "poza", "pagina prezentare", "picture", "code",
-        "photo & map", "poza locatie", "imagine", "imagini 1", "foto",
-        "link poza suport publicitar", "link foto", "foto locatie",
-        "adresa", "photo/video", "site"
+    # unified hyperlink-bearing headers (normalized)
+    HYPERLINK_HEADERS = {
+        "poza", "photo", "schita", "link poza", "foto", "link foto", "imagini", "picture",
+        "catalog", "photo/video", "photo & map",
+        "cod", "pagina prezentare", "code", "poza locatie", "imagine", "imagini 1",
+        "link poza suport publicitar", "foto locatie", "adresa", "site"
     }
+    URL_RE = re.compile(r"^(?:https?://|www\.)", re.IGNORECASE)
+    HYPERLINK_FORMULA_RE = re.compile(r'^\s*=\s*HYPERLINK\(\s*"([^"]+)"', re.IGNORECASE)
 
     def __init__(self, groups, directory=None):
         self.groups = groups
         self.directory = directory
 
     @staticmethod
-    def extract_hyperlinks(file_input):
+    def _extract_hyperlinks(file_input, sheet_index=0):
         """
-        Returns a dict mapping (row_idx, col_idx) -> hyperlink URL
-        row_idx, col_idx are 0-based to match pandas indexing.
+        Returns {(row0, col0): url} for the given sheet.
+        Supports both cell.hyperlink and =HYPERLINK("url","text").
+        Indices are 0-based to match pandas.
         """
-        if hasattr(file_input, "seek"):  # BytesIO case
+        if hasattr(file_input, "seek"):
             file_input.seek(0)
-        wb = load_workbook(file_input, data_only=True)
-        ws = wb.active
+        # data_only=False so we can read formulas
+        wb = load_workbook(file_input, data_only=False, read_only=False)
+        # use the same sheet as pandas (index 0)
+        ws = wb.worksheets[sheet_index]
 
         links = {}
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.hyperlink:
-                    # openpyxl row/column are 1-based, convert to 0-based
-                    links[(cell.row - 1, cell.column - 1)] = cell.hyperlink.target
+        for r, row in enumerate(ws.iter_rows()):
+            for c, cell in enumerate(row):
+                url = None
+                if cell.hyperlink and getattr(cell.hyperlink, "target", None):
+                    url = cell.hyperlink.target
+                else:
+                    v = cell.value
+                    if isinstance(v, str):
+                        m = DataProcessor.HYPERLINK_FORMULA_RE.match(v)
+                        if m:
+                            url = m.group(1)
+                if url:
+                    links[(r, c)] = url
         return links
-    
 
     def extract_standardized_dataframe(self, file_input, file_name=None):
         """
         Reads Excel/CSV, matches columns using groups.json, and returns a standardized DataFrame.
         Consolidates all relevant hyperlinks into a single "Photo Link" column.
         """
-
         if isinstance(file_input, (str, bytes, os.PathLike)):
             file_name = os.path.basename(file_input)
             read_target = file_input
@@ -123,7 +133,7 @@ class DataProcessor:
             if file_name is None:
                 file_name = "uploaded_file.xlsx"
 
-        # Read once without headers to find header row
+        # 1) sniff header row
         try:
             if hasattr(read_target, "seek"):
                 read_target.seek(0)
@@ -132,7 +142,6 @@ class DataProcessor:
             print(f"Failed to read {file_name}: {e}")
             return pd.DataFrame()
 
-        # Heuristic: first row with >= 9 non-empty cells
         header_row_index = None
         for i, row in raw_data.iterrows():
             if row.count() >= 9:
@@ -141,49 +150,75 @@ class DataProcessor:
         if header_row_index is None:
             return pd.DataFrame()
 
-        # Read full dataframe with headers
+        # 2) read full sheet with headers
         if hasattr(read_target, "seek"):
             read_target.seek(0)
         df = pd.read_excel(read_target, sheet_name=0, header=header_row_index, engine="openpyxl")
         columns = df.columns
 
-        # Extract hyperlinks from original Excel
+        # 3) pull hyperlinks from the SAME sheet (sheet 0), with formula support
         if hasattr(read_target, "seek"):
             read_target.seek(0)
-        hyperlinks = self.extract_hyperlinks(read_target)
+        hyperlinks = self._extract_hyperlinks(read_target, sheet_index=0)
 
+        # 4) build extracted output and reserve canonical Photo Link
         extracted = pd.DataFrame()
-        extracted["Photo Link"] = ""   # single column for all hyperlinks
+        extracted["Photo Link"] = ""   # canonical column for URLs only
 
+        # 4a) copy non-Photo-Link groups
         for name, cfg in self.groups.items():
+            # Do not copy the group named "Photo Link" as text; it collides with the URL column
+            if TextUtils.normalize_text(name) == "photo link":
+                continue
+
             best, _ = ColumnMatcher.find_best_match(
                 columns,
-                keywords=cfg["keywords"],
+                keywords=cfg.get("keywords", []),
                 priority=cfg.get("priority", []),
                 avoid=cfg.get("avoid", [])
             )
-
             if best:
-                extracted[name] = df[best]  # keep original text
-
-                # Check if this matched column should carry hyperlinks
-                normalized = TextUtils.normalize_text(best)
-                if normalized in self.HYPERLINK_COLUMNS:
-                    col_idx = df.columns.get_loc(best)
-                    for row_idx in range(len(df)):
-                        excel_row_idx = row_idx + header_row_index + 1
-                        excel_col_idx = col_idx
-                        if (excel_row_idx, excel_col_idx) in hyperlinks:
-                            link = hyperlinks[(excel_row_idx, excel_col_idx)]
-                            # if empty, set link (otherwise keep existing first non-empty)
-                            if not extracted.at[row_idx, "Photo Link"]:
-                                extracted.at[row_idx, "Photo Link"] = link
+                extracted[name] = df[best]
             else:
-                extracted[name] = ""  # column not found, fill with empty string
+                extracted[name] = ""
 
-        # Track source file
+        # 4b) scan ALL df columns that are known to carry hyperlinks (independent of groups)
+        candidate_cols = []
+        for col in df.columns:
+            if TextUtils.normalize_text(col) in self.HYPERLINK_HEADERS:
+                candidate_cols.append(col)
+
+        # map candidate column indices to openpyxl 0-based indices
+        candidate_col_indices = [df.columns.get_loc(c) for c in candidate_cols]
+
+        # for each row, gather URLs from any candidate column
+        for row_idx in range(len(df)):
+            xl_row0 = header_row_index + 1 + row_idx  # openpyxl 0-based row index for this df row
+            found = []
+
+            # 1) prefer embedded hyperlinks (relationship or formula)
+            for col_idx in candidate_col_indices:
+                key = (xl_row0, col_idx)
+                url = hyperlinks.get(key)
+                if url:
+                    found.append(url)
+
+            # 2) fallback: detect raw URLs typed as text in those cells
+            if not found:
+                for col_idx in candidate_col_indices:
+                    val = df.iloc[row_idx, col_idx]
+                    if isinstance(val, str) and self.URL_RE.match(val.strip()):
+                        url = val.strip()
+                        if url.lower().startswith("www."):
+                            url = "http://" + url
+                        found.append(url)
+
+            if found:
+                # keep first, or join all: "; ".join(dict.fromkeys(found))
+                extracted.at[row_idx, "Photo Link"] = found[0]
+
+        # 5) track source file
         extracted["__source_file"] = file_name
-
         return extracted
 
     @staticmethod
@@ -258,7 +293,7 @@ class DataProcessor:
             dt = pd.to_datetime(value, dayfirst=True, errors="raise")
             return dt.strftime("%Y-%m-%d")
         except Exception:
-            return value  
+            return value
 
     @staticmethod
     def calculate_no_of_months(row):
@@ -302,13 +337,13 @@ class DataProcessor:
         final_df = self.process_dates(final_df)
         final_df = self.deal_with_literal_dates(final_df)
         final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
-        final_df["NUME FURNIZOR"] = (final_df["__source_file"]
-                .astype(str)                        
-                .str.strip()                          
-                .str.replace(r"\.xlsx$", "", regex=True, case=False)  
-                .str.rstrip("-")
-                .str.strip()                         
-            )
+        final_df["NUME FURNIZOR"] = (
+            final_df["__source_file"]
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.xlsx$", "", regex=True, case=False)
+            .str.rstrip("-")
+            .str.strip()
+        )
         final_df = final_df.drop(columns=["Latitude", "Longitude"], errors="ignore")
-
         return final_df

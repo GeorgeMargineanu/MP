@@ -13,7 +13,7 @@
             ],
         "avoid": []
     },
-    "Local": {
+    "City": {
         "keywords": [
             "localitate",
             "locali",
@@ -124,6 +124,18 @@
             "weekly base impacts"
         ]
     },
+    "Height": {
+        "keywords": [
+            "inaltime",
+            "height"
+        ],
+        "priority": [
+            "inaltime",
+            "height",
+            "H"
+        ],
+        "avoid": []
+    },
     "Size": {
         "keywords": [
             "size",
@@ -135,18 +147,6 @@
             "dimensiuni",
             "dimensiune",
             "size"
-        ],
-        "avoid": []
-    },
-    "Height": {
-        "keywords": [
-            "inaltime",
-            "height"
-        ],
-        "priority": [
-            "inaltime",
-            "height",
-            "H"
         ],
         "avoid": []
     },
@@ -196,6 +196,33 @@
         "keywords": [],
         "avoid":[]
     },
+    "Rent/month": {
+        "keywords": []
+    },
+    "Total rent": {
+        "keywords": []
+    },
+    "Production": {
+        "keywords": []
+    },
+    "Posting": {
+        "keywords": []
+    },
+    "Ag Comm %": {
+        "keywords": []
+    },
+    "Agency commission": {
+        "keywords": []
+    },
+    "Advertising taxe %": {
+        "keywords": []
+    },
+    "Advertising taxe": {
+        "keywords": []
+    },
+    "Total Cost": {
+        "keywords": []
+    },
     "Photo Link": {
         "keywords": [
             "poza",
@@ -207,7 +234,8 @@
             "imagini",
             "picture",
             "catalog",
-            "photo/video"
+            "photo/video",
+            "Photo & Map"
         ],
         "priority": [
             "schita",
@@ -282,10 +310,10 @@
         "keywords": ["idx"],    
         "priority": ["idx"]
     },
-    "Nume furnizor":{
+    "NUME FURNIZOR":{
         "keywords": []
     },
-    "Chirie Furnizor": {
+    "CHIRIE FURNIZOR": {
         "keywords": [
             "chirie",
             "pret chirie",
@@ -313,13 +341,13 @@
             "taxa"
         ]
     },
-    "Postare furnizor":{
+    "POSTARE FURNIZOR":{
         "keywords": [],
         "priority": [
             "postare furnizor"
         ]
     },
-    "Cost productie": {
+    "COST PRODUCTIE": {
         "keywords": [
             "productie",
             "cost productie",
@@ -341,7 +369,7 @@
             "taxa"
         ]
     },
-    "Tip material": {
+    "TIP MATERIAL": {
         "keywords": [
             "tip material",
             "tip suport",

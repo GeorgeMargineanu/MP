@@ -4,8 +4,9 @@ import json
 import io
 import time
 from logic import DataProcessor
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
+from excel_styling import style_and_export_excel
 
 st.set_page_config(
     page_title="Data Processor",
@@ -97,37 +98,14 @@ if st.session_state.final_df is not None:
         st.dataframe(df_per_company, use_container_width=True)
 
     with tab2:
-        output_buffer = io.BytesIO()
-        with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
-            final_df.to_excel(writer, index=False, sheet_name="Processed Data")
-
-            workbook = writer.book
-            worksheet = writer.sheets["Processed Data"]
-
-            # style header
-            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-            header_font = Font(color="FFFFFF", bold=True)
-
-            for col_num, col_name in enumerate(final_df.columns, 1):
-                cell = worksheet.cell(row=1, column=col_num)
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-
-            max_col_width = 40
-            # auto column width, wrap text, zebra striping
-            for col_num, col_name in enumerate(final_df.columns, 1):
-                col_letter = get_column_letter(col_num)
-                max_length = max(final_df[col_name].astype(str).map(len).max(), len(col_name)) + 2
-                worksheet.column_dimensions[col_letter].width = min(max_length, max_col_width)
-
-                for row_idx, row in enumerate(worksheet[col_letter], start=1):
-                    row.alignment = Alignment(wrap_text=True, vertical="top")
-                    if row_idx > 1:  # zebra striping, skip header
-                        if row_idx % 2 == 0:
-                            row.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-
-        output_buffer.seek(0) 
+        metadata = {
+            "Brand": "",
+            "Campaign": "",
+            "Version": "",
+            "Start": "",
+            "End": ""
+        }
+        output_buffer = style_and_export_excel(final_df, metadata=metadata)
 
         st.download_button(
             label="Download Excel",
@@ -143,5 +121,6 @@ if st.session_state.final_df is not None:
         col1.metric("📂 Files Processed", len(file_objs))
         col2.metric("📊 Rows Combined", len(final_df))
         col3.metric("🧾 Columns Detected", len(final_df.columns))
+
 else:
     st.info("⬅ Please upload a `groups.json` file and at least one Excel/CSV file to begin.")

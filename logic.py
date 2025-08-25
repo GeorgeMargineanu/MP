@@ -103,20 +103,19 @@ class DataProcessor:
 
     def extract_standardized_dataframe(self, file_input, file_name=None):
         """
-        file_input can be:
-        - a string path
-        - a file-like object (BytesIO)
-        file_name is optional (used for labelling source when file_input is a buffer)
+        Reads Excel/CSV, matches columns using groups.json, and returns a standardized DataFrame.
+        Hyperlinks in Photo Link / Address / Link columns are preserved in separate columns.
         """
+
         if isinstance(file_input, (str, bytes, os.PathLike)):
             file_name = os.path.basename(file_input)
             read_target = file_input
         else:
-            read_target = file_input  # assume file-like
+            read_target = file_input
             if file_name is None:
                 file_name = "uploaded_file.xlsx"
 
-        # read once without headers to find header row
+        # Read once without headers to find header row
         try:
             if hasattr(read_target, "seek"):
                 read_target.seek(0)
@@ -125,22 +124,22 @@ class DataProcessor:
             print(f"Failed to read {file_name}: {e}")
             return pd.DataFrame()
 
+        # Heuristic: first row with >= 9 non-empty cells
         header_row_index = None
         for i, row in raw_data.iterrows():
-            if row.count() >= 9:  # your heuristic for header
+            if row.count() >= 9:
                 header_row_index = i
                 break
-
         if header_row_index is None:
             return pd.DataFrame()
 
-        # read again with correct header row
+        # Read full dataframe with headers
         if hasattr(read_target, "seek"):
             read_target.seek(0)
         df = pd.read_excel(read_target, sheet_name=0, header=header_row_index, engine="openpyxl")
         columns = df.columns
 
-        # also load hyperlinks with openpyxl
+        # Extract hyperlinks from original Excel
         if hasattr(read_target, "seek"):
             read_target.seek(0)
         hyperlinks = self.extract_hyperlinks(read_target)
@@ -155,21 +154,25 @@ class DataProcessor:
             )
 
             if best:
-                extracted[name] = df[best]
+                extracted[name] = df[best]  # keep original text
 
-                # special handling: if it's a photo link column, replace text with hyperlink
-                if name.lower() in ["photo link", "photo", "link foto", "poza", "picture", "schita", "link",  
-                                    "foto","imagine", "poza",  "picture",  "sketch", "pagina prezentare",  "schita productie","google map","photo", "google maps"]:
-                                
-                    col_idx = list(columns).index(best)
+                # Check if this column is a "link-type"
+                if any(k in name.lower() for k in ["photo", "link", "address", "adresa", "foto"]):
+                    col_idx = df.columns.get_loc(best)
+                    hyperlink_col_name = f"Photo Link - {name}"
+                    extracted[hyperlink_col_name] = ""  # separate column for hyperlinks
+
                     for row_idx in range(len(df)):
-                        excel_row_idx = row_idx + header_row_index + 1  # adjust for skipped rows
-                        if (excel_row_idx, col_idx) in hyperlinks:
-                            extracted.at[row_idx, name] = hyperlinks[(excel_row_idx, col_idx)]
+                        excel_row_idx = row_idx + header_row_index + 1  # openpyxl rows are 1-based
+                        excel_col_idx = col_idx
+                        if (excel_row_idx, excel_col_idx) in hyperlinks:
+                            extracted.at[row_idx, hyperlink_col_name] = hyperlinks[(excel_row_idx, excel_col_idx)]
             else:
-                extracted[name] = ""
+                extracted[name] = ""  # column not found, fill with empty string
 
+        # Track source file
         extracted["__source_file"] = file_name
+
         return extracted
 
     @staticmethod
@@ -288,7 +291,7 @@ class DataProcessor:
         final_df = self.process_dates(final_df)
         final_df = self.deal_with_literal_dates(final_df)
         final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
-        final_df["Nume furnizor"] = (final_df["__source_file"]
+        final_df["NUME FURNIZOR"] = (final_df["__source_file"]
                 .astype(str)                        
                 .str.strip()                          
                 .str.replace(r"\.xlsx$", "", regex=True, case=False)  

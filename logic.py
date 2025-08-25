@@ -5,7 +5,7 @@ import unicodedata
 import numpy as np
 import datetime
 from openpyxl import load_workbook
-
+import calendar
 
 class TextUtils:
     @staticmethod
@@ -324,10 +324,29 @@ class DataProcessor:
         try:
             start = pd.to_datetime(row["Start"], errors="coerce")
             end = pd.to_datetime(row["End"], errors="coerce")
-            if pd.isna(start) or pd.isna(end):
+            if pd.isna(start) or pd.isna(end) or start > end:
                 return None
-            delta_days = (end - start).days
-            return round(delta_days / 30, 1)
+
+            # First month fraction
+            days_in_start_month = calendar.monthrange(start.year, start.month)[1]
+            first_month_fraction = (days_in_start_month - start.day + 1) / days_in_start_month
+
+            # Last month fraction
+            days_in_end_month = calendar.monthrange(end.year, end.month)[1]
+            last_month_fraction = end.day / days_in_end_month
+
+            # Full months in between
+            full_months = 0
+            # Move to next month after start
+            current = pd.Timestamp(year=start.year, month=start.month, day=1) + pd.offsets.MonthBegin(1)
+            # Loop until the start of end month
+            while current < pd.Timestamp(year=end.year, month=end.month, day=1):
+                full_months += 1
+                current += pd.offsets.MonthBegin(1)
+
+            total_months = first_month_fraction + full_months + last_month_fraction
+            return round(total_months, 2)
+
         except Exception:
             return None
 

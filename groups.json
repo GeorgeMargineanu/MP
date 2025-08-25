@@ -271,7 +271,12 @@
         "priority": ["sketch name", "sketch details", "nume schita", "numele schitei", "detalii schita"]
     },
     "Tech details":{
-        "keywords": []
+        "keywords": [],
+        "priority": [
+            "tech details",
+            "technical details",
+            "detalii tehnice"
+        ]
     },
     "idx":{
         "keywords": ["idx"],    
@@ -309,7 +314,10 @@
         ]
     },
     "Postare furnizor":{
-        "keywords": []
+        "keywords": [],
+        "priority": [
+            "postare furnizor"
+        ]
     },
     "Cost productie": {
         "keywords": [

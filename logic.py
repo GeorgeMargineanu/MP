@@ -7,6 +7,7 @@ import numpy as np
 import datetime
 from openpyxl import load_workbook
 
+
 class TextUtils:
     @staticmethod
     def normalize_text(text: str) -> str:
@@ -76,10 +77,17 @@ class ColumnMatcher:
 
 
 class DataProcessor:
+    # all possible hyperlink-bearing columns (normalized)
+    HYPERLINK_COLUMNS = {
+        "link poza", "catalog", "cod", "poza", "pagina prezentare", "picture", "code",
+        "photo & map", "poza locatie", "imagine", "imagini 1", "foto",
+        "link poza suport publicitar", "link foto", "foto locatie",
+        "adresa", "photo/video", "site"
+    }
+
     def __init__(self, groups, directory=None):
         self.groups = groups
         self.directory = directory
-
 
     @staticmethod
     def extract_hyperlinks(file_input):
@@ -104,7 +112,7 @@ class DataProcessor:
     def extract_standardized_dataframe(self, file_input, file_name=None):
         """
         Reads Excel/CSV, matches columns using groups.json, and returns a standardized DataFrame.
-        Hyperlinks in Photo Link / Address / Link columns are preserved in separate columns.
+        Consolidates all relevant hyperlinks into a single "Photo Link" column.
         """
 
         if isinstance(file_input, (str, bytes, os.PathLike)):
@@ -145,6 +153,8 @@ class DataProcessor:
         hyperlinks = self.extract_hyperlinks(read_target)
 
         extracted = pd.DataFrame()
+        extracted["Photo Link"] = ""   # single column for all hyperlinks
+
         for name, cfg in self.groups.items():
             best, _ = ColumnMatcher.find_best_match(
                 columns,
@@ -156,17 +166,18 @@ class DataProcessor:
             if best:
                 extracted[name] = df[best]  # keep original text
 
-                # Check if this column is a "link-type"
-                if any(k in name.lower() for k in ["photo", "link", "address", "adresa", "foto"]):
+                # Check if this matched column should carry hyperlinks
+                normalized = TextUtils.normalize_text(best)
+                if normalized in self.HYPERLINK_COLUMNS:
                     col_idx = df.columns.get_loc(best)
-                    hyperlink_col_name = f"Photo Link - {name}"
-                    extracted[hyperlink_col_name] = ""  # separate column for hyperlinks
-
                     for row_idx in range(len(df)):
-                        excel_row_idx = row_idx + header_row_index + 1  # openpyxl rows are 1-based
+                        excel_row_idx = row_idx + header_row_index + 1
                         excel_col_idx = col_idx
                         if (excel_row_idx, excel_col_idx) in hyperlinks:
-                            extracted.at[row_idx, hyperlink_col_name] = hyperlinks[(excel_row_idx, excel_col_idx)]
+                            link = hyperlinks[(excel_row_idx, excel_col_idx)]
+                            # if empty, set link (otherwise keep existing first non-empty)
+                            if not extracted.at[row_idx, "Photo Link"]:
+                                extracted.at[row_idx, "Photo Link"] = link
             else:
                 extracted[name] = ""  # column not found, fill with empty string
 
@@ -298,6 +309,6 @@ class DataProcessor:
                 .str.rstrip("-")
                 .str.strip()                         
             )
-        final_df = final_df.drop(columns=["Latitude", "Longitude"])
+        final_df = final_df.drop(columns=["Latitude", "Longitude"], errors="ignore")
 
         return final_df

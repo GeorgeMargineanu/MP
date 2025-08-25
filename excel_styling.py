@@ -5,16 +5,30 @@ import pandas as pd
 import io
 
 def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
+
+    #Change the order
+        # --- Reorder columns according to desired order ---
+    columns_ordered = [
+        "County", "City", "Address", "ID", "IDF", "Panel type", 
+        "Format", "Base", "Height", "Size", "Faces", "Start", "End", 
+        "No. of months", "Rent/month", "Total rent", "Production",
+        "Posting", "Ag Comm %", "Agency commission", "Advertising taxe %", 
+        "Advertising taxe", "Total Cost", "Photo Link", "GPS", "Sketch name", 
+        "Tech Details", "idx", "NUME FURNIZOR", "CHIRIE FURNIZOR", "POSTARE FURNIZOR",
+        "COST PRODUCTIE", "TIP MATERIAL", "__source_file"
+    ]
+    df = df[[col for col in columns_ordered if col in df.columns]]
     """
     Exports a styled Excel file:
     - Inserts image at D2
     - Metadata rows: Brand, Campaign, Version, Start, End (A2:B6)
     - DataFrame starting from row 10
-    - Hyperlinks automatically styled
+    - Hyperlinks automatically styled, with display text:
+        - Photo Link -> "photo"
+        - Tech Details -> "sketch"
     """
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
-        # Write DataFrame starting at row 10
         df.to_excel(writer, index=False, sheet_name="Processed Data", startrow=9)
         workbook = writer.book
         worksheet = writer.sheets["Processed Data"]
@@ -66,14 +80,14 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         cell.fill = title_fill
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # --- Metadata Rows (A2:B6) ---
+        # --- Metadata Rows ---
         meta_fields = ["Brand", "Campaign", "Version", "Start", "End"]
         for i, field in enumerate(meta_fields, start=2):
             worksheet.cell(row=i, column=1, value=field).font = Font(bold=True, name="Calibri", size=9)
             worksheet.cell(row=i, column=2, value=metadata.get(field, "")).font = body_font
 
         # --- Determine hyperlink columns dynamically ---
-        hyperlink_columns = [col for col in df.columns if any(k in col.lower() for k in ["photo", "link", "address"])]
+        hyperlink_columns = [col for col in df.columns if any(k in col.lower() for k in ["photo", "link", "address", "tech details"])]
 
         # --- Format DataFrame area ---
         for col_num, col_name in enumerate(df.columns, 1):
@@ -88,16 +102,34 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                         cell.font = header_font_white
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                 elif row_idx > 10:  # Body
-                    if col_name in hyperlink_columns and cell.value and str(cell.value).startswith("http"):
-                        link = str(cell.value)
-                        cell.value = "link" if "address" in col_name.lower() else "photo"
-                        cell.hyperlink = link
-                        cell.font = hyperlink_font
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    if col_name in hyperlink_columns and cell.value:
+                        link = str(cell.value).strip()
+                        # Check if it's actually a URL
+                        if link.lower().startswith(("http://", "https://", "www.")):
+                            # Decide display text
+                            if "tech details" in col_name.lower():
+                                display_text = "sketch"
+                            elif "address" in col_name.lower():
+                                display_text = "link"
+                            else:
+                                display_text = "photo"
+
+                            # Ensure http:// prefix if missing
+                            if not link.lower().startswith(("http://", "https://")):
+                                link = "http://" + link
+
+                            cell.value = display_text
+                            cell.hyperlink = link
+                            cell.font = hyperlink_font
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                        else:
+                            # Not a URL, just leave the text
+                            cell.font = body_font
+                            cell.alignment = Alignment(wrap_text=True, vertical="top")
                     else:
                         cell.font = body_font
                         cell.alignment = Alignment(wrap_text=True, vertical="top")
-                    # Zebra striping
+
                     if row_idx % 2 == 0:
                         cell.fill = gray_fill
 

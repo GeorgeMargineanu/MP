@@ -83,6 +83,13 @@ class DataProcessor:
         "cod", "pagina prezentare", "code", "poza locatie", "imagine", "imagini 1",
         "link poza suport publicitar", "foto locatie", "adresa", "site"
     }
+
+    TECH_DETAILS_HEADERS = {
+        "schita", "foto schita", "production sketch", "schita productie",
+        "schita de productie pentru material publicitar",
+        "link schita productie", "technical details"
+    }
+
     URL_RE = re.compile(r"^(?:https?://|www\.)", re.IGNORECASE)
     HYPERLINK_FORMULA_RE = re.compile(r'^\s*=\s*HYPERLINK\(\s*"([^"]+)"', re.IGNORECASE)
 
@@ -123,7 +130,7 @@ class DataProcessor:
     def extract_standardized_dataframe(self, file_input, file_name=None):
         """
         Reads Excel/CSV, matches columns using groups.json, and returns a standardized DataFrame.
-        Consolidates all relevant hyperlinks into a single "Photo Link" column.
+        Consolidates all relevant hyperlinks into "Photo Link" and "Tech Details" columns.
         """
         if isinstance(file_input, (str, bytes, os.PathLike)):
             file_name = os.path.basename(file_input)
@@ -161,14 +168,15 @@ class DataProcessor:
             read_target.seek(0)
         hyperlinks = self._extract_hyperlinks(read_target, sheet_index=0)
 
-        # 4) build extracted output and reserve canonical Photo Link
+        # 4) build extracted output
         extracted = pd.DataFrame()
         extracted["Photo Link"] = ""   # canonical column for URLs only
+        extracted["Tech Details"] = "" # canonical column for tech-related URLs
 
-        # 4a) copy non-Photo-Link groups
+        # 4a) copy non-Photo-Link / non-Tech-Details groups
         for name, cfg in self.groups.items():
-            # Do not copy the group named "Photo Link" as text; it collides with the URL column
-            if TextUtils.normalize_text(name) == "photo link":
+            normalized_name = TextUtils.normalize_text(name)
+            if normalized_name in ("photo link", "tech details"):
                 continue
 
             best, _ = ColumnMatcher.find_best_match(
@@ -182,44 +190,60 @@ class DataProcessor:
             else:
                 extracted[name] = ""
 
-        # 4b) scan ALL df columns that are known to carry hyperlinks (independent of groups)
-        candidate_cols = []
-        for col in df.columns:
-            if TextUtils.normalize_text(col) in self.HYPERLINK_HEADERS:
-                candidate_cols.append(col)
+        # 4b) candidate columns for hyperlinks
+        candidate_cols_photo = [col for col in df.columns if TextUtils.normalize_text(col) in self.HYPERLINK_HEADERS]
 
-        # map candidate column indices to openpyxl 0-based indices
-        candidate_col_indices = [df.columns.get_loc(c) for c in candidate_cols]
+        TECH_DETAILS_HEADERS = {
+            "schita", "foto schita", "production sketch", "schita productie",
+            "schita de productie pentru material publicitar",
+            "link schita productie", "technical details"
+        }
+        candidate_cols_tech = [col for col in df.columns if TextUtils.normalize_text(col) in TECH_DETAILS_HEADERS]
 
-        # for each row, gather URLs from any candidate column
+        candidate_col_indices_photo = [df.columns.get_loc(c) for c in candidate_cols_photo]
+        candidate_col_indices_tech  = [df.columns.get_loc(c) for c in candidate_cols_tech]
+
+        # 4c) fill Photo Link and Tech Details
         for row_idx in range(len(df)):
-            xl_row0 = header_row_index + 1 + row_idx  # openpyxl 0-based row index for this df row
-            found = []
-
-            # 1) prefer embedded hyperlinks (relationship or formula)
-            for col_idx in candidate_col_indices:
-                key = (xl_row0, col_idx)
-                url = hyperlinks.get(key)
+            xl_row0 = header_row_index + 1 + row_idx
+            # --- Photo Link ---
+            found_photo = []
+            for col_idx in candidate_col_indices_photo:
+                url = hyperlinks.get((xl_row0, col_idx))
                 if url:
-                    found.append(url)
-
-            # 2) fallback: detect raw URLs typed as text in those cells
-            if not found:
-                for col_idx in candidate_col_indices:
+                    found_photo.append(url)
+            if not found_photo:
+                for col_idx in candidate_col_indices_photo:
                     val = df.iloc[row_idx, col_idx]
                     if isinstance(val, str) and self.URL_RE.match(val.strip()):
                         url = val.strip()
                         if url.lower().startswith("www."):
                             url = "http://" + url
-                        found.append(url)
+                        found_photo.append(url)
+            if found_photo:
+                extracted.at[row_idx, "Photo Link"] = found_photo[0]
 
-            if found:
-                # keep first, or join all: "; ".join(dict.fromkeys(found))
-                extracted.at[row_idx, "Photo Link"] = found[0]
+            # --- Tech Details ---
+            found_tech = []
+            for col_idx in candidate_col_indices_tech:
+                url = hyperlinks.get((xl_row0, col_idx))
+                if url:
+                    found_tech.append(url)
+            if not found_tech:
+                for col_idx in candidate_col_indices_tech:
+                    val = df.iloc[row_idx, col_idx]
+                    if isinstance(val, str) and self.URL_RE.match(val.strip()):
+                        url = val.strip()
+                        if url.lower().startswith("www."):
+                            url = "http://" + url
+                        found_tech.append(url)
+            if found_tech:
+                extracted.at[row_idx, "Tech Details"] = found_tech[0]
 
         # 5) track source file
         extracted["__source_file"] = file_name
         return extracted
+
 
     @staticmethod
     def remove_empty_columns(df, excepted_columns):

@@ -3,14 +3,13 @@ import pandas as pd
 import json
 import io
 import time
+import os
 from logic import DataProcessor
-from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 from excel_styling import style_and_export_excel
 
 st.set_page_config(
     page_title="Data Processor",
-    page_icon="static/images/logo.png",  # favicon
+    page_icon="static/images/logo.png",
     layout="wide"
 )
 
@@ -23,7 +22,13 @@ st.caption(
 )
 
 st.sidebar.header("⚙️ Configuration")
-groups_file = st.sidebar.file_uploader("Upload groups.json", type="json")
+
+# Automatically load groups.json from the same directory as app.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+groups_path = os.path.join(current_dir, "groups.json")
+
+with open(groups_path, "r", encoding="utf-8") as f:
+    groups = json.load(f)  # already a dict
 
 uploaded_files = st.file_uploader(
     "Upload Excel/CSV files",
@@ -31,19 +36,19 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-# 🔹 Initialize session_state storage
+# ------------------- Session State -------------------
 if "final_df" not in st.session_state:
     st.session_state.final_df = None
 if "file_objs" not in st.session_state:
     st.session_state.file_objs = []
 
+# Cached CSV reader
 @st.cache_data
 def _read_csv(uploaded_file):
     return pd.read_csv(uploaded_file)
 
-if groups_file and uploaded_files and st.session_state.final_df is None:
-    groups = json.load(groups_file)
-
+# ------------------- Processing -------------------
+if uploaded_files and st.session_state.final_df is None:
     file_objs = []
     for uploaded_file in uploaded_files:
         if uploaded_file.type == "text/csv" or uploaded_file.name.endswith(".csv"):
@@ -77,9 +82,9 @@ if groups_file and uploaded_files and st.session_state.final_df is None:
         st.session_state.final_df = pd.concat(all_results, ignore_index=True)
         st.session_state.file_objs = file_objs
     else:
-        st.warning(" No data could be extracted.")
+        st.warning("No data could be extracted.")
 
-# 🔹 Display if already processed
+# ------------------- Display -------------------
 if st.session_state.final_df is not None:
     final_df = st.session_state.final_df
     file_objs = st.session_state.file_objs
@@ -89,9 +94,7 @@ if st.session_state.final_df is not None:
     with tab1:
         st.sidebar.markdown('-----------------')
         options = final_df["__source_file"].unique()
-
-        select_provider = st.sidebar.selectbox("Select the provider",
-                                               options=options)
+        select_provider = st.sidebar.selectbox("Select the provider for a quick view", options)
         
         st.write("🔍 Summary for the selected provider :")
         df_per_company = final_df[final_df["__source_file"] == select_provider]
@@ -123,4 +126,4 @@ if st.session_state.final_df is not None:
         col3.metric("🧾 Columns Detected", len(final_df.columns))
 
 else:
-    st.info("⬅ Please upload a `groups.json` file and at least one Excel/CSV file to begin.")
+    st.info("⬅ Please upload at least one Excel/CSV file to begin.")

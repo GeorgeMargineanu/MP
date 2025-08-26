@@ -6,6 +6,7 @@ import time
 import os
 from logic import DataProcessor
 from excel_styling import style_and_export_excel
+from guide import show_app_info
 
 pd.set_option("future.no_silent_downcasting", True)
 
@@ -45,8 +46,6 @@ if "file_objs" not in st.session_state:
 if "prev_agency_commission" not in st.session_state:
     st.session_state.prev_agency_commission = None
 
-# ------------------- Cached CSV reader -------------------
-@st.cache_data
 def _read_csv(uploaded_file):
     return pd.read_csv(uploaded_file)
 
@@ -134,3 +133,6 @@ if st.session_state.final_df is not None:
         col3.metric("🧾 Columns Detected", len(final_df.columns))
 else:
     st.info("⬅ Please upload at least one Excel/CSV file and click **Process Files** to begin.")
+
+
+show_app_info()

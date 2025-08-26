@@ -298,17 +298,30 @@ class DataProcessor:
         return [None, None]
 
     def deal_with_literal_dates(self, df):
-        def process(x, current_end):
-            if self.check_if_literal_date(x):
-                start, end = self.split_literal_date(x)
-                return pd.Series([start, end])
+        """
+        Extract the first 'Disponibil' period from multi-line text if Start/End are messy.
+        """
+
+        def extract_disponibil(x, current_end):
+            if pd.isna(x):
+                return pd.Series([None, None])
+
+            x_str = str(x)
+
+            # look for 'Disponibil:' line and capture first date range
+            match = re.search(r"Disponibil:\s*(\d{2}/\d{2}/\d{2})\s*:\s*(\d{2}/\d{2}/\d{2})", x_str)
+            if match:
+                start_str, end_str = match.groups()
+                try:
+                    start = pd.to_datetime(start_str, dayfirst=True).strftime("%Y-%m-%d")
+                    end = pd.to_datetime(end_str, dayfirst=True).strftime("%Y-%m-%d")
+                    return pd.Series([start, end])
+                except:
+                    return pd.Series([x, current_end])
             else:
                 return pd.Series([x, current_end])
 
-        df[["Start", "End"]] = df.apply(
-            lambda row: process(row["Start"], row["End"]),
-            axis=1
-        )
+        df[["Start", "End"]] = df.apply(lambda row: extract_disponibil(row["Start"], row["End"]), axis=1)
         return df
 
     @staticmethod

@@ -349,6 +349,32 @@ class DataProcessor:
 
         except Exception:
             return None
+    
+    @staticmethod
+    def calculate_area_from_size(size_str):
+        if pd.isna(size_str):
+            return None
+
+        # normalize: lowercase, unify separators, remove units and spaces
+        cleaned = (
+            str(size_str)
+            .lower()
+            .replace(",", ".")
+            .replace("×", "x")
+            .replace("m", "")
+            .replace(" ", "")
+        )
+
+        # regex: look for two numbers separated by 'x'
+        match = re.search(r"(\d*\.?\d+)[xX](\d*\.?\d+)", cleaned)
+        if match:
+            try:
+                base = float(match.group(1))
+                height = float(match.group(2))
+                return round(base * height, 2)
+            except:
+                return None
+        return None
 
     @staticmethod
     def build_gps_from_lat_long(row):
@@ -389,4 +415,6 @@ class DataProcessor:
             .str.strip()
         )
         final_df = final_df.drop(columns=["Latitude", "Longitude"], errors="ignore")
+        final_df["Format"] = final_df["Size"]
+        final_df["Size"] = final_df["Size"].apply(self.calculate_area_from_size)
         return final_df

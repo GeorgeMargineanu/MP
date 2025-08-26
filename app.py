@@ -15,8 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.sidebar.image("static/images/logo.png", width=120)  
-
+st.sidebar.image("static/images/logo.png", width=120)
 st.title("MP Data Processor")
 st.caption(
     "Upload multiple Excel/CSV files, process them with your `groups.json` config, "
@@ -24,13 +23,13 @@ st.caption(
 )
 
 st.sidebar.header("⚙️ Configuration")
+agency_commission = st.sidebar.number_input("Enter the agency commission", value=1.0, step=0.1)
 
-# Automatically load groups.json from the same directory as app.py
+# Automatically load groups.json
 current_dir = os.path.dirname(os.path.abspath(__file__))
 groups_path = os.path.join(current_dir, "groups.json")
-
 with open(groups_path, "r", encoding="utf-8") as f:
-    groups = json.load(f)  # already a dict
+    groups = json.load(f)
 
 uploaded_files = st.file_uploader(
     "Upload Excel/CSV files",
@@ -43,15 +42,23 @@ if "final_df" not in st.session_state:
     st.session_state.final_df = None
 if "file_objs" not in st.session_state:
     st.session_state.file_objs = []
+if "prev_agency_commission" not in st.session_state:
+    st.session_state.prev_agency_commission = None
 
-# Cached CSV reader
+# ------------------- Cached CSV reader -------------------
 @st.cache_data
 def _read_csv(uploaded_file):
     return pd.read_csv(uploaded_file)
 
-# ------------------- Processing -------------------
-if uploaded_files and st.session_state.final_df is None:
+# ------------------- Processing Trigger -------------------
+process_button = st.sidebar.button("Process Files")
+
+if process_button and uploaded_files:
+    st.session_state.final_df = None
+    st.session_state.prev_agency_commission = agency_commission
+
     file_objs = []
+
     for uploaded_file in uploaded_files:
         if uploaded_file.type == "text/csv" or uploaded_file.name.endswith(".csv"):
             df = _read_csv(uploaded_file)
@@ -63,7 +70,7 @@ if uploaded_files and st.session_state.final_df is None:
             buffer.seek(0)
         file_objs.append((buffer, uploaded_file.name))
 
-    processor = DataProcessor(groups)
+    processor = DataProcessor(groups, agency_commission)
 
     st.subheader("⚙️ Processing Files")
     progress_bar = st.progress(0)
@@ -86,7 +93,7 @@ if uploaded_files and st.session_state.final_df is None:
     else:
         st.warning("No data could be extracted.")
 
-# ------------------- Display -------------------
+# ------------------- Display Tabs -------------------
 if st.session_state.final_df is not None:
     final_df = st.session_state.final_df
     file_objs = st.session_state.file_objs
@@ -97,7 +104,6 @@ if st.session_state.final_df is not None:
         st.sidebar.markdown('-----------------')
         options = final_df["__source_file"].unique()
         select_provider = st.sidebar.selectbox("Select the provider for a quick view", options)
-        
         st.write("🔍 Summary for the selected provider :")
         df_per_company = final_df[final_df["__source_file"] == select_provider]
         st.dataframe(df_per_company, use_container_width=True)
@@ -126,6 +132,5 @@ if st.session_state.final_df is not None:
         col1.metric("📂 Files Processed", len(file_objs))
         col2.metric("📊 Rows Combined", len(final_df))
         col3.metric("🧾 Columns Detected", len(final_df.columns))
-
 else:
-    st.info("⬅ Please upload at least one Excel/CSV file to begin.")
+    st.info("⬅ Please upload at least one Excel/CSV file and click **Process Files** to begin.")

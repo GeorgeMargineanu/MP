@@ -5,9 +5,7 @@ import pandas as pd
 import io
 
 def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
-
-    #Change the order
-        # --- Reorder columns according to desired order ---
+    # --- Reorder columns according to desired order ---
     columns_ordered = [
         "County", "City", "Address", "ID", "IDF", "Panel type", 
         "Format", "Base", "Height", "Size", "Faces", "Start", "End", 
@@ -18,20 +16,15 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         "COST PRODUCTIE", "TIP MATERIAL", "__source_file"
     ]
     df = df[[col for col in columns_ordered if col in df.columns]]
-    """
-    Exports a styled Excel file:
-    - Inserts image at D2
-    - Metadata rows: Brand, Campaign, Version, Start, End (A2:B6)
-    - DataFrame starting from row 10
-    - Hyperlinks automatically styled, with display text:
-        - Photo Link -> "photo"
-        - Tech Details -> "sketch"
-    """
+
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Processed Data", startrow=9)
         workbook = writer.book
         worksheet = writer.sheets["Processed Data"]
+
+        # --- Hide default gridlines ---
+        worksheet.sheet_view.showGridLines = False
 
         # --- Insert Image ---
         image_path = "static/images/for_excel_output.png"
@@ -71,6 +64,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         }
 
         max_col_width = 40
+        last_col_letter = get_column_letter(len(df.columns))
 
         # --- Title Row ---
         worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2)
@@ -79,12 +73,17 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         cell.font = title_font
         cell.fill = title_fill
         cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border  # border for A1:B1
 
-        # --- Metadata Rows ---
+        # --- Metadata Rows (A2:B6) ---
         meta_fields = ["Brand", "Campaign", "Version", "Start", "End"]
         for i, field in enumerate(meta_fields, start=2):
-            worksheet.cell(row=i, column=1, value=field).font = Font(bold=True, name="Calibri", size=9)
-            worksheet.cell(row=i, column=2, value=metadata.get(field, "")).font = body_font
+            c1 = worksheet.cell(row=i, column=1, value=field)
+            c1.font = Font(bold=True, name="Calibri", size=9)
+            c1.border = thin_border
+            c2 = worksheet.cell(row=i, column=2, value=metadata.get(field, ""))
+            c2.font = body_font
+            c2.border = thin_border
 
         # --- Determine hyperlink columns dynamically ---
         hyperlink_columns = [col for col in df.columns if any(k in col.lower() for k in ["photo", "link", "address", "tech details"])]
@@ -93,7 +92,13 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         for col_num, col_name in enumerate(df.columns, 1):
             col_letter = get_column_letter(col_num)
             for row_idx, cell in enumerate(worksheet[col_letter], start=1):
-                if row_idx == 10:  # Header
+
+                # Rows 1–9, columns C→last column: untouched (no font, no fill, no border)
+                if 1 <= row_idx <= 9 and col_num >= 3:
+                    continue
+
+                # Header row
+                if row_idx == 10:
                     if col_name in special_columns:
                         cell.fill = yellow_fill
                         cell.font = header_font_red
@@ -101,29 +106,26 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                         cell.fill = red_fill
                         cell.font = header_font_white
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                elif row_idx > 10:  # Body
+                    cell.border = thin_border
+
+                # Body rows
+                elif row_idx > 10:
                     if col_name in hyperlink_columns and cell.value:
                         link = str(cell.value).strip()
-                        # Check if it's actually a URL
                         if link.lower().startswith(("http://", "https://", "www.")):
-                            # Decide display text
                             if "tech details" in col_name.lower():
                                 display_text = "sketch"
                             elif "address" in col_name.lower():
                                 display_text = "link"
                             else:
                                 display_text = "photo"
-
-                            # Ensure http:// prefix if missing
                             if not link.lower().startswith(("http://", "https://")):
                                 link = "http://" + link
-
                             cell.value = display_text
                             cell.hyperlink = link
                             cell.font = hyperlink_font
                             cell.alignment = Alignment(horizontal="center", vertical="center")
                         else:
-                            # Not a URL, just leave the text
                             cell.font = body_font
                             cell.alignment = Alignment(wrap_text=True, vertical="top")
                     else:
@@ -133,7 +135,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                     if row_idx % 2 == 0:
                         cell.fill = gray_fill
 
-                cell.border = thin_border
+                    cell.border = thin_border  # body borders
 
             # Auto column width
             max_length = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2

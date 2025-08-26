@@ -93,8 +93,9 @@ class DataProcessor:
     URL_RE = re.compile(r"^(?:https?://|www\.)", re.IGNORECASE)
     HYPERLINK_FORMULA_RE = re.compile(r'^\s*=\s*HYPERLINK\(\s*"([^"]+)"', re.IGNORECASE)
 
-    def __init__(self, groups, directory=None):
+    def __init__(self, groups, agency_commission, directory=None, ):
         self.groups = groups
+        self.agency_commission = agency_commission
         self.directory = directory
 
     @staticmethod
@@ -362,7 +363,74 @@ class DataProcessor:
 
         except Exception:
             return None
-    
+
+    @staticmethod
+    def fix_literal_date_ranges(df):
+        current_year = datetime.datetime.now().year
+
+        # dd <month> - dd <month>  (allow diacritics and optional dot after month)
+        pattern = re.compile(
+            r"^\s*(\d{1,2})\s+([A-Za-z\.ăâîșțşţ]+)\s*-\s*(\d{1,2})\s+([A-Za-z\.ăâîșțşţ]+)\s*$",
+            re.IGNORECASE
+        )
+
+        # RO + EN months (full + common abbrevs)
+        MONTHS = {
+            "ianuarie":1,"ian":1,"jan":1,"january":1,
+            "februarie":2,"feb":2,"february":2,
+            "martie":3,"mar":3,"march":3,
+            "aprilie":4,"apr":4,"april":4,
+            "mai":5,"may":5,
+            "iunie":6,"iun":6,"jun":6,"june":6,
+            "iulie":7,"iul":7,"jul":7,"july":7,
+            "august":8,"aug":8,
+            "septembrie":9,"sept":9,"sep":9,"september":9,
+            "octombrie":10,"oct":10,"october":10,
+            "noiembrie":11,"nov":11,"november":11,
+            "decembrie":12,"dec":12,"december":12,
+        }
+
+        def _normalize_mon(token: str) -> str:
+            # lower, strip trailing dot, replace common diacritics
+            t = token.lower().strip().rstrip(".")
+            t = (t.replace("ă","a").replace("â","a").replace("î","i")
+                .replace("ș","s").replace("ş","s")
+                .replace("ț","t").replace("ţ","t"))
+            return t
+
+        def _parse_literal(value):
+            if not isinstance(value, str):
+                return None, None
+            m = pattern.match(value.strip())
+            if not m:
+                return None, None
+
+            d1, mon1, d2, mon2 = m.groups()
+            mon1 = MONTHS.get(_normalize_mon(mon1))
+            mon2 = MONTHS.get(_normalize_mon(mon2))
+            if not mon1 or not mon2:
+                return None, None
+
+            try:
+                start = pd.Timestamp(year=current_year, month=mon1, day=int(d1))
+                end   = pd.Timestamp(year=current_year, month=mon2, day=int(d2))
+                # handle ranges that cross New Year (e.g., 15 dec - 15 jan)
+                if end < start:
+                    end = end + pd.DateOffset(years=1)
+                return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+            except Exception:
+                return None, None
+
+        # apply row-wise; keep original if parsing fails
+        def _fix_row(row):
+            s, e = _parse_literal(row["Start"])
+            if s and e:
+                return pd.Series([s, e])
+            return pd.Series([row["Start"], row["End"]])
+
+        df[["Start","End"]] = df.apply(_fix_row, axis=1)
+        return df
+
     @staticmethod
     def calculate_area_from_size(size_str):
         if pd.isna(size_str):
@@ -417,7 +485,8 @@ class DataProcessor:
         final_df[["Base", "Height", "Size"]] = final_df.apply(self.process_size_base_height, axis=1)
         final_df["GPS"] = final_df.apply(self.build_gps_from_lat_long, axis=1)
         final_df = self.process_dates(final_df)
-        final_df = self.deal_with_literal_dates(final_df)
+        final_df = self.deal_with_literal_dates(final_df) 
+        final_df = self.fix_literal_date_ranges(final_df)   
         final_df["No. of months"] = final_df.apply(self.calculate_no_of_months, axis=1)
         final_df["NUME FURNIZOR"] = (
             final_df["__source_file"]
@@ -435,12 +504,16 @@ class DataProcessor:
         final_df["POSTARE FURNIZOR"] = pd.to_numeric(final_df["POSTARE FURNIZOR"], errors="coerce")
         final_df["No. of months"] = pd.to_numeric(final_df["No. of months"], errors="coerce")
 
+        #Replace the meter
+        final_df["Format"] = final_df["Format"].astype(str).str.replace("[mM]", "", regex=True)
+        final_df["Base"]   = final_df["Base"].astype(str).str.replace("[mM]", "", regex=True)
+        final_df["Height"] = final_df["Height"].astype(str).str.replace("[mM]", "", regex=True)
 
         # calculations
         final_df["Rent/month"] = final_df["Rent/month"] * 1.2
         final_df["Production"] = final_df["Size"].fillna(0) * 5
         final_df["Posting"] = final_df["POSTARE FURNIZOR"].fillna(0) * 1.2
-        final_df["Ag Comm %"] = 1 / 100
+        final_df["Ag Comm %"] = self.agency_commission
         final_df["Total rent"] = final_df["Rent/month"].fillna(0) * final_df["No. of months"].fillna(0)
     
         # commission = sum of valid parts

@@ -378,9 +378,24 @@
         ]
     },
     "POSTARE FURNIZOR":{
-        "keywords": [],
+        "keywords": [
+            "decorare",
+            "postare"
+        ],
         "priority": [
-            "postare furnizor"
+            "decorare",
+            "decorare\neuro (fara tva)",
+            "posting /face",
+            "posting (euro)",
+            "posting (eur)",
+            "postare",
+            "decorare/rotatie",
+            "decorare + neutralizare",
+            "cost decorare (euro)",
+            "decorare\n& neutralizare\n/(mp) (locatie)\n(euro)",
+            "decorare material publicitar",
+            "pret decorare/ fata/ luna (euro)",
+            "cost decorare\neuro/fata\nfara tva"
         ]
     },
     "COST PRODUCTIE": {
@@ -394,8 +409,12 @@
         ],
         "priority": [
             "productie",
+            "production (euro)",
+            "production (eur)",
             "cost productie",
-            "production"
+            "price/month with discount*",
+            "productie\n/mp\n(euro)",
+            "productie/mp(euro)"
         ],
         "avoid": [
             "decorare",
@@ -413,7 +432,8 @@
             "tip material",
             "material type",
             "poster type",
-            "material productie"
+            "material productie",
+            "poster type"
         ],
         "avoid": [
             "tip suport",

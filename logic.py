@@ -430,4 +430,28 @@ class DataProcessor:
         final_df = final_df.drop(columns=["Latitude", "Longitude"], errors="ignore")
         final_df["Format"] = final_df["Size"]
         final_df["Size"] = final_df["Size"].apply(self.calculate_area_from_size)
+        final_df["Size"] = pd.to_numeric(final_df["Size"], errors="coerce")
+        final_df["Rent/month"] = pd.to_numeric(final_df["Rent/month"], errors="coerce")
+        final_df["POSTARE FURNIZOR"] = pd.to_numeric(final_df["POSTARE FURNIZOR"], errors="coerce")
+        final_df["No. of months"] = pd.to_numeric(final_df["No. of months"], errors="coerce")
+
+
+        # calculations
+        final_df["Rent/month"] = final_df["Rent/month"] * 1.2
+        final_df["Production"] = final_df["Size"].fillna(0) * 5
+        final_df["Posting"] = final_df["POSTARE FURNIZOR"].fillna(0) * 1.2
+        final_df["Ag Comm %"] = 1 / 100
+        final_df["Total rent"] = final_df["Rent/month"].fillna(0) * final_df["No. of months"].fillna(0)
+    
+        # commission = sum of valid parts
+        final_df["Agency commission"] = (
+                final_df["Posting"].fillna(0) +
+                final_df["Production"].fillna(0) +
+                final_df["Total rent"].fillna(0)
+            ) * final_df["Ag Comm %"]
+
+        final_df["Advertising taxe %"] = 3 / 100
+        final_df["Advertising taxe"] = ((final_df["Total rent"] + final_df["Posting"]) * final_df["Ag Comm %"] + final_df["Total rent"] + final_df["Posting"]) * final_df["Advertising taxe %"]
+        final_df["Total Cost"] = final_df["Advertising taxe"] + final_df["Agency commission"] + final_df["Posting"] + final_df["Production"] + final_df["Total rent"]                              
+            
         return final_df

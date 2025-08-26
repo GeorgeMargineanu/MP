@@ -7,6 +7,8 @@ import os
 from logic import DataProcessor
 from excel_styling import style_and_export_excel
 
+pd.set_option("future.no_silent_downcasting", True)
+
 st.set_page_config(
     page_title="Data Processor",
     page_icon="static/images/logo.png",

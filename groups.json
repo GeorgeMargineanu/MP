@@ -153,8 +153,7 @@
     "Faces": {
         "keywords": [
             "fete",
-            "faces",
-
+            "faces"
         ],
         "priority": [
             "fete",
@@ -162,7 +161,10 @@
             "numar fete",
             "faces no",
             "numar de fete",
-            "number of faces"
+            "number of faces",
+            "nr. fete",
+            "no. faces",
+            "nr fete"
         ],
         "avoid": []
     },
@@ -200,7 +202,28 @@
         "avoid":[]
     },
     "Rent/month": {
-        "keywords": []
+        "keywords": [
+            "chirie", 
+            "rent",
+            "/luna",
+            "/ luna",
+            "pe luna",
+            "lunar",
+            "chiria"
+        ],
+        "priority": [
+            "pret chirie lunar",
+            "pret (lunar)",
+            "pret(lunar)",
+            "chirie",
+            "chirie/luna",
+            "chirie / luna",
+            "chiria/luna"
+        ],
+        "avoid":[
+            "total",
+            "lumina"
+        ]
     },
     "Total rent": {
         "keywords": []
@@ -384,23 +407,22 @@
     },
     "TIP MATERIAL": {
         "keywords": [
-            "tip material",
-            "tip suport",
-            "material type",
-            "support type"
+            "material"
         ],
         "priority": [
             "tip material",
-            "tip format",
-            "tip panou"
+            "material type",
+            "poster type",
+            "material productie"
         ],
         "avoid": [
-            "productie",
-            "chirie",
-            "decorare",
-            "iluminare",
-            "taxa",
-            "tip suport"
+            "tip suport",
+            "tip panou",
+            "categorie suport",
+            "support type",
+            "suport publicitar",
+            "adresa",
+            "adresa livrare material"
         ]
-    }
+}
 }

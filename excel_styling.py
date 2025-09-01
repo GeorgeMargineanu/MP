@@ -45,7 +45,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         hyperlink_font = Font(name="Calibri", size=9, color="0000FF", underline="single")
 
         title_fill = PatternFill(start_color="305496", end_color="305496", fill_type="solid")
-        red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        red_fill = PatternFill(start_color="F05055", end_color="F05055", fill_type="solid")
         yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
 

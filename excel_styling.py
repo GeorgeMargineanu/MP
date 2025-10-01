@@ -30,7 +30,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         image_path = "static/images/for_excel_output.png"
         try:
             img = XLImage(image_path)
-            img.anchor = "D2"
+            img.anchor = "O2"
             img.height = img.height / 2
             img.width = img.width / 2
             worksheet.add_image(img)
@@ -47,8 +47,20 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             worksheet[f"V{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
             worksheet[f"W{i}"].value = f"=U{i}+T{i}+R{i}+Q{i}+P{i}"      # Total Cost
 
+        # --- 2) apply Euro formatting to columns O:W (15..23) but skip 19 and 21 ---
+            cols_to_format = [c for c in range(15, 24) if c not in (19, 21)]  # 15..23 inclusive, skipping 19 & 21
+
+            for row in range(start_row, worksheet.max_row + 1):
+                for col in cols_to_format:
+                    cell = worksheet.cell(row=row, column=col)
+                    # optional: skip totally-empty cells
+                    if cell.value is None:
+                        continue
+                    # set euro number format even if the cell currently contains a formula string
+                    cell.number_format = '€#,##0.00'
+
         # --- Styles ---
-        title_font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
+        title_font = Font(name="Calibri", size=9, bold=True, color="000000")
         header_font_white = Font(name="Calibri", size=9, color="FFFFFF", bold=True)
         header_font_red = Font(name="Calibri", size=9, color="FF0000", bold=True)
         body_font = Font(name="Calibri", size=9)
@@ -80,13 +92,12 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2)
         cell = worksheet.cell(row=1, column=1)
         cell.value = "MP OOH CAMPAIGN"
-        cell.font = title_font
-        cell.fill = title_fill
+        cell.font = title_font   
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border  # border for A1:B1
 
         # --- Metadata Rows (A2:B6) ---
-        meta_fields = ["Brand", "Campaign", "Version", "Start", "End"]
+        meta_fields = ["Client", "Brand", "Campaign", "Version", "Start", "End"]
         for i, field in enumerate(meta_fields, start=2):
             c1 = worksheet.cell(row=i, column=1, value=field)
             c1.font = Font(bold=True, name="Calibri", size=9)
@@ -117,6 +128,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                         cell.font = header_font_white
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     cell.border = thin_border
+                    worksheet.row_dimensions[cell.row].height = 35
 
                 # Body rows
                 elif row_idx > 10:
@@ -150,6 +162,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             # Auto column width
             max_length = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2
             worksheet.column_dimensions[col_letter].width = min(max_length, max_col_width)
+            
 
     output_buffer.seek(0)
     return output_buffer

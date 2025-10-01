@@ -280,10 +280,30 @@ class DataProcessor:
             "Height": f"{height}m" if height else None,
             "Size": size if size else None
         })
+    
+    @staticmethod
+    def _format_date(value):
+        # 1) Try to convert anything to Timestamp
+        try:
+            dt = pd.to_datetime(value, errors="coerce", dayfirst=True)
+        except Exception:
+            dt = None
+
+        if pd.isna(dt):
+            return str(value)  # leave original, ensure it's a string
+
+        # 2) Format consistently
+        try:
+            # Linux/macOS: remove leading zero from day
+            return dt.strftime("%-d-%b-%y")
+        except Exception:
+            # Windows fallback: keep leading zero
+            return dt.strftime("%d-%b-%y")
+
 
     def process_dates(self, df):
-        df["Start"] = df["Start"].apply(self._safe_to_date)
-        df["End"]   = df["End"].apply(self._safe_to_date)
+        df["Start"] = df["Start"].apply(self._format_date)
+        df["End"]   = df["End"].apply(self._format_date)
         return df
 
     @staticmethod
@@ -325,14 +345,6 @@ class DataProcessor:
 
         df[["Start", "End"]] = df.apply(lambda row: extract_disponibil(row["Start"], row["End"]), axis=1)
         return df
-
-    @staticmethod
-    def _safe_to_date(value):
-        try:
-            dt = pd.to_datetime(value, dayfirst=True, errors="raise")
-            return dt.strftime("%d-%b-%y")
-        except Exception:
-            return value
 
     @staticmethod
     def calculate_no_of_months(row):

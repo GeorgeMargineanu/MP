@@ -37,6 +37,16 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         except Exception as e:
             print(f"Could not insert image: {e}")
 
+        # --- Apply formulas ---
+        start_row = 11
+        for i, row in enumerate(df.itertuples(index=False), start=start_row):
+            worksheet[f"Q{i}"].value = f"=J{i}*5"                       # Production
+            worksheet[f"R{i}"].value = f"=AE{i}*1.2"                     # Posting
+            worksheet[f"P{i}"].value = f"=O{i}*N{i}"                     # Total rent
+            worksheet[f"T{i}"].value = f"=(R{i}+Q{i}+P{i})*S{i}"         # Agency commission
+            worksheet[f"U{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
+            worksheet[f"W{i}"].value = f"=U{i}+T{i}+R{i}+Q{i}+P{i}"      # Total Cost
+
         # --- Styles ---
         title_font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
         header_font_white = Font(name="Calibri", size=9, color="FFFFFF", bold=True)

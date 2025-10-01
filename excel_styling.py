@@ -54,6 +54,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                 cell.value = end_date
                 cell.number_format = "d-mmm-yy"
 
+            #worksheet[f"O{i}"].value = f"=O{i}*1.2"  
             worksheet[f"Q{i}"].value = f"=J{i}*5"                       # Production
             worksheet[f"R{i}"].value = f"=AE{i}*1.2"                     # Posting
             worksheet[f"P{i}"].value = f"=O{i}*N{i}"                     # Total rent
@@ -64,13 +65,12 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             # No. of months column
             worksheet[f"N{i}"].value = (
                 f'=IF(OR(L{i}="", M{i}="", L{i}>M{i}), "", '
-                f'(DAY(EOMONTH(L{i},0))-DAY(L{i})+1)/DAY(EOMONTH(L{i},0)) + '
+                f'ROUND((DAY(EOMONTH(L{i},0))-DAY(L{i})+1)/DAY(EOMONTH(L{i},0)) + '
                 f'IF(AND(YEAR(L{i})=YEAR(M{i}), MONTH(L{i})=MONTH(M{i})), 0, '
                 f'DATEDIF(EOMONTH(L{i},0)+1, DATE(YEAR(M{i}), MONTH(M{i}), 1), "m")) + '
-                f'DAY(M{i})/DAY(EOMONTH(M{i},0))'
+                f'DAY(M{i})/DAY(EOMONTH(M{i},0)), 2)'
                 f')'
             )
-
 
         # --- 2) apply Euro formatting to columns O:W (15..23) but skip 19 and 21 ---
             cols_to_format_to_euro = [c for c in range(15, 24) if c not in (19, 21)]  # 15..23 inclusive, skipping 19 & 21

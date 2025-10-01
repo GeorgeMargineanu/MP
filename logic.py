@@ -97,6 +97,7 @@ class DataProcessor:
         self.groups = groups
         self.agency_commission = agency_commission
         self.directory = directory
+        self.advertising_taxe = 0.03
 
     @staticmethod
     def _extract_hyperlinks(file_input, sheet_index=0):
@@ -523,7 +524,7 @@ class DataProcessor:
         #        final_df["Total rent"].fillna(0)
         #    ) * final_df["Ag Comm %"]
 
-        final_df["Advertising taxe %"] = 3 / 100
+        final_df["Advertising taxe %"] = self.advertising_taxe
         #final_df["Advertising taxe"] = ((final_df["Total rent"] + final_df["Posting"]) * final_df["Ag Comm %"] + final_df["Total rent"] + final_df["Posting"]) * final_df["Advertising taxe %"]
         #final_df["Total Cost"] = final_df["Advertising taxe"] + final_df["Agency commission"] + final_df["Posting"] + final_df["Production"] + final_df["Total rent"]                              
             

@@ -44,7 +44,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             worksheet[f"R{i}"].value = f"=AE{i}*1.2"                     # Posting
             worksheet[f"P{i}"].value = f"=O{i}*N{i}"                     # Total rent
             worksheet[f"T{i}"].value = f"=(R{i}+Q{i}+P{i})*S{i}"         # Agency commission
-            worksheet[f"U{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
+            worksheet[f"V{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
             worksheet[f"W{i}"].value = f"=U{i}+T{i}+R{i}+Q{i}+P{i}"      # Total Cost
 
         # --- Styles ---

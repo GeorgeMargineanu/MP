@@ -24,7 +24,8 @@ st.caption(
 )
 
 st.sidebar.header("⚙️ Configuration")
-agency_commission = st.sidebar.number_input("Enter the agency commission", value=1.0, step=0.1)
+agency_commission = st.sidebar.number_input("Enter the agency commission (as percent, e.g., 1 for 1%)", value=1.0, step=0.1)
+agency_commission = agency_commission / 100
 
 # Automatically load groups.json
 current_dir = os.path.dirname(os.path.abspath(__file__))

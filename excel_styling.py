@@ -46,18 +46,36 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             worksheet[f"T{i}"].value = f"=(R{i}+Q{i}+P{i})*S{i}"         # Agency commission
             worksheet[f"V{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
             worksheet[f"W{i}"].value = f"=U{i}+T{i}+R{i}+Q{i}+P{i}"      # Total Cost
+            
+            # No. of months column
+            worksheet[f"N{i}"].value = (
+                f'=IF(OR(L{i}="", M{i}="", L{i}>M{i}), "", '
+                f'(DAY(EOMONTH(L{i},0))-DAY(L{i})+1)/DAY(EOMONTH(L{i},0)) + '
+                f'DATEDIF(EOMONTH(L{i},0)+1, DATE(YEAR(M{i}), MONTH(M{i}), 1), "m") + '
+                f'DAY(M{i})/DAY(EOMONTH(M{i},0))'
+                f')'
+            )
 
         # --- 2) apply Euro formatting to columns O:W (15..23) but skip 19 and 21 ---
-            cols_to_format = [c for c in range(15, 24) if c not in (19, 21)]  # 15..23 inclusive, skipping 19 & 21
-
+            cols_to_format_to_euro = [c for c in range(15, 24) if c not in (19, 21)]  # 15..23 inclusive, skipping 19 & 21
             for row in range(start_row, worksheet.max_row + 1):
-                for col in cols_to_format:
+                for col in cols_to_format_to_euro:
                     cell = worksheet.cell(row=row, column=col)
                     # optional: skip totally-empty cells
                     if cell.value is None:
                         continue
                     # set euro number format even if the cell currently contains a formula string
                     cell.number_format = '€#,##0.00'
+        # --- 3) apply Percentage % formatting to columns O:W (15..23) but skip 19 and 21 ---
+            cols_to_format_to_percentage = [19, 21] #Ag Comm% and Advertising taxe %
+            for row in range(start_row, worksheet.max_row + 1):
+                for col in cols_to_format_to_percentage:
+                    cell = worksheet.cell(row=row, column=col)
+                    # optional: skip totally-empty cells
+                    if cell.value is None:
+                        continue
+                    # set euro number format even if the cell currently contains a formula string
+                    cell.number_format = '0.00%'
 
         # --- Styles ---
         title_font = Font(name="Calibri", size=9, bold=True, color="000000")
@@ -77,10 +95,8 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
         )
 
         special_columns = {
-            "Rent/ month", "Total rent", "Production", "Posting",
-            "Ag Comm %", "Agency commission",
-            "Advertising taxe %", "Advertising taxe",
-            "Total Cost"
+            "idx", "NUME FURNIZOR", "CHIRIE FURNIZOR",
+             "COST PRODUCTIE", "TIP MATERIAL", "POSTARE FURNIZOR", "__source_file"
         }
 
         max_col_width = 40

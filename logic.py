@@ -330,7 +330,7 @@ class DataProcessor:
     def _safe_to_date(value):
         try:
             dt = pd.to_datetime(value, dayfirst=True, errors="raise")
-            return dt.strftime("%Y-%m-%d")
+            return dt.strftime("%d-%b-%y")
         except Exception:
             return value
 
@@ -509,23 +509,6 @@ class DataProcessor:
         final_df["Format"] = final_df["Format"].astype(str).str.replace("[mM]", "", regex=True)
         final_df["Base"]   = final_df["Base"].astype(str).str.replace("[mM]", "", regex=True)
         final_df["Height"] = final_df["Height"].astype(str).str.replace("[mM]", "", regex=True)
-
-        # calculations
-        #final_df["Rent/month"] = final_df["Rent/month"] * 1.2
-        #final_df["Production"] = final_df["Size"].fillna(0) * 5
-        #final_df["Posting"] = final_df["POSTARE FURNIZOR"].fillna(0) * 1.2
         final_df["Ag Comm %"] = self.agency_commission
-        #final_df["Total rent"] = final_df["Rent/month"].fillna(0) * final_df["No. of months"].fillna(0)
-    
-        # commission = sum of valid parts
-        #final_df["Agency commission"] = (
-        #        final_df["Posting"].fillna(0) +
-        #        final_df["Production"].fillna(0) +
-        #        final_df["Total rent"].fillna(0)
-        #    ) * final_df["Ag Comm %"]
-
         final_df["Advertising taxe %"] = self.advertising_taxe
-        #final_df["Advertising taxe"] = ((final_df["Total rent"] + final_df["Posting"]) * final_df["Ag Comm %"] + final_df["Total rent"] + final_df["Posting"]) * final_df["Advertising taxe %"]
-        #final_df["Total Cost"] = final_df["Advertising taxe"] + final_df["Agency commission"] + final_df["Posting"] + final_df["Production"] + final_df["Total rent"]                              
-            
         return final_df

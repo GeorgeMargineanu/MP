@@ -58,6 +58,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
 
         # Convenience lookups (raise KeyError if missing -> early and loud)
         col_size           = header_to_letter["Size"]                      # J (expected)
+        col_faces          = header_to_letter["Faces"]                     # K
         col_start          = header_to_letter["Start"]                     # L
         col_end            = header_to_letter["End"]                       # M
         col_no_months      = header_to_letter["No. of months"]             # N
@@ -95,8 +96,8 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             # Rent/month = CHIRIE FURNIZOR * 1.2
             worksheet[f"{col_rent_month}{i}"].value = f"={col_chirie_furn}{i}*1.2"
 
-            # Production = Size * 5
-            worksheet[f"{col_production}{i}"].value = f"={col_size}{i}*5"
+            # Production = Size * Faces * 5
+            worksheet[f"{col_production}{i}"].value = f"={col_size}{i}*{col_faces}{i}*5"
 
             # Posting = POSTARE FURNIZOR * 1.2
             worksheet[f"{col_posting}{i}"].value = f"={col_postare_furn}{i}*1.2"

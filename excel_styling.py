@@ -5,20 +5,31 @@ import pandas as pd
 import io
 
 def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
-    # --- Reorder columns according to desired order ---
+    # --- Desired column order (will keep only those present) ---
     columns_ordered = [
-        "County", "City", "Address", "ID", "IDF", "Panel type", 
-        "Format", "Base", "Height", "Size", "Faces", "Start", "End", 
+        "County", "City", "Address", "ID", "IDF", "Panel type",
+        "Format", "Base", "Height", "Size", "Faces", "Start", "End",
         "No. of months", "Rent/month", "Total rent", "Production",
-        "Posting", "Ag Comm %", "Agency commission", "Advertising taxe %", 
-        "Advertising taxe", "Total Cost", "Photo Link", "GPS", "Sketch name", 
+        "Posting", "Ag Comm %", "Agency commission", "Advertising taxe %",
+        "Advertising taxe", "Total Cost", "Photo Link", "GPS", "Sketch name",
         "Tech Details", "idx", "NUME FURNIZOR", "CHIRIE FURNIZOR", "POSTARE FURNIZOR",
         "COST PRODUCTIE", "TIP MATERIAL", "__source_file"
     ]
-    df = df[[col for col in columns_ordered if col in df.columns]]
+    df = df[[col for col in columns_ordered if col in df.columns]].copy()
+
+    # --- Guardrails: required columns for formulas ---
+    required = {
+        "Start", "End", "No. of months", "Rent/month", "Total rent", "Production",
+        "Posting", "Ag Comm %", "Agency commission", "Advertising taxe %",
+        "Advertising taxe", "Total Cost", "Size", "CHIRIE FURNIZOR", "POSTARE FURNIZOR"
+    }
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+        # Write DataFrame starting at row 10 (0-indexed startrow=9)
         df.to_excel(writer, index=False, sheet_name="Processed Data", startrow=9)
         workbook = writer.book
         worksheet = writer.sheets["Processed Data"]
@@ -35,62 +46,111 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             img.width = img.width / 2
             worksheet.add_image(img)
         except Exception as e:
+            # Non-fatal
             print(f"Could not insert image: {e}")
 
-        # --- Apply formulas ---
+        # --- Build header -> column letter map dynamically ---
+        HEADER_ROW = 10  # because df headers land on row 10 when startrow=9
+        header_to_letter = {}
+        for col_idx, cell in enumerate(worksheet[HEADER_ROW], start=1):
+            if cell.value:
+                header_to_letter[str(cell.value).strip()] = get_column_letter(col_idx)
+
+        # Convenience lookups (raise KeyError if missing -> early and loud)
+        col_size           = header_to_letter["Size"]                      # J (expected)
+        col_start          = header_to_letter["Start"]                     # L
+        col_end            = header_to_letter["End"]                       # M
+        col_no_months      = header_to_letter["No. of months"]             # N
+        col_rent_month     = header_to_letter["Rent/month"]                # O
+        col_total_rent     = header_to_letter["Total rent"]                # P
+        col_production     = header_to_letter["Production"]                # Q
+        col_posting        = header_to_letter["Posting"]                   # R
+        col_ag_comm_pct    = header_to_letter["Ag Comm %"]                 # S
+        col_ag_comm        = header_to_letter["Agency commission"]         # T
+        col_adv_tax_pct    = header_to_letter["Advertising taxe %"]        # U
+        col_adv_tax        = header_to_letter["Advertising taxe"]          # V
+        col_total_cost     = header_to_letter["Total Cost"]                # W
+        col_chirie_furn    = header_to_letter["CHIRIE FURNIZOR"]           # AD (expected)
+        col_postare_furn   = header_to_letter["POSTARE FURNIZOR"]          # AE (expected)
+
+        # --- Apply formulas & date values ---
         start_row = 11
+        last_row = start_row + len(df) - 1
+
         for i, row in enumerate(df.itertuples(index=False), start=start_row):
-             # Start date
-            start_date = pd.to_datetime(row.Start, errors="coerce")
+            # Start date
+            start_date = pd.to_datetime(getattr(row, "Start"), errors="coerce")
             if not pd.isna(start_date):
-                cell = worksheet[f"L{i}"]
-                cell.value = start_date
-                cell.number_format = "d-mmm-yy"
+                c = worksheet[f"{col_start}{i}"]
+                c.value = start_date
+                c.number_format = "d-mmm-yy"
 
             # End date
-            end_date = pd.to_datetime(row.End, errors="coerce")
+            end_date = pd.to_datetime(getattr(row, "End"), errors="coerce")
             if not pd.isna(end_date):
-                cell = worksheet[f"M{i}"]
-                cell.value = end_date
-                cell.number_format = "d-mmm-yy"
+                c = worksheet[f"{col_end}{i}"]
+                c.value = end_date
+                c.number_format = "d-mmm-yy"
 
-            #worksheet[f"O{i}"].value = f"=O{i}*1.2"  
-            worksheet[f"Q{i}"].value = f"=J{i}*5"                       # Production
-            worksheet[f"R{i}"].value = f"=AE{i}*1.2"                     # Posting
-            worksheet[f"P{i}"].value = f"=O{i}*N{i}"                     # Total rent
-            worksheet[f"T{i}"].value = f"=(R{i}+Q{i}+P{i})*S{i}"         # Agency commission
-            worksheet[f"V{i}"].value = f"=((P{i}+R{i})*S{i}+P{i}+R{i})*0.03"  # Advertising taxe
-            worksheet[f"W{i}"].value = f"=U{i}+T{i}+R{i}+Q{i}+P{i}"      # Total Cost
-            
-            # No. of months column
-            worksheet[f"N{i}"].value = (
-                f'=IF(OR(L{i}="", M{i}="", L{i}>M{i}), "", '
-                f'ROUND((DAY(EOMONTH(L{i},0))-DAY(L{i})+1)/DAY(EOMONTH(L{i},0)) + '
-                f'IF(AND(YEAR(L{i})=YEAR(M{i}), MONTH(L{i})=MONTH(M{i})), 0, '
-                f'DATEDIF(EOMONTH(L{i},0)+1, DATE(YEAR(M{i}), MONTH(M{i}), 1), "m")) + '
-                f'DAY(M{i})/DAY(EOMONTH(M{i},0)), 2)'
-                f')'
+            # Rent/month = CHIRIE FURNIZOR * 1.2
+            worksheet[f"{col_rent_month}{i}"].value = f"={col_chirie_furn}{i}*1.2"
+
+            # Production = Size * 5
+            worksheet[f"{col_production}{i}"].value = f"={col_size}{i}*5"
+
+            # Posting = POSTARE FURNIZOR * 1.2
+            worksheet[f"{col_posting}{i}"].value = f"={col_postare_furn}{i}*1.2"
+
+            # Total rent = Rent/month * No. of months
+            worksheet[f"{col_total_rent}{i}"].value = f"={col_rent_month}{i}*{col_no_months}{i}"
+
+            # Agency commission = (Posting + Production + Total rent) * Ag Comm %
+            worksheet[f"{col_ag_comm}{i}"].value = (
+                f"=({col_posting}{i}+{col_production}{i}+{col_total_rent}{i})*{col_ag_comm_pct}{i}"
             )
 
-        # --- 2) apply Euro formatting to columns O:W (15..23) but skip 19 and 21 ---
-            cols_to_format_to_euro = [c for c in range(15, 24) if c not in (19, 21)]  # 15..23 inclusive, skipping 19 & 21
-            for row in range(start_row, worksheet.max_row + 1):
-                for col in cols_to_format_to_euro:
-                    cell = worksheet.cell(row=row, column=col)
-                    # optional: skip totally-empty cells
-                    if cell.value is None:
-                        continue
-                    # set euro number format even if the cell currently contains a formula string
+            # Advertising taxe = (((Total rent + Posting) * Ag Comm %) + Total rent + Posting) * 0.03
+            worksheet[f"{col_adv_tax}{i}"].value = (
+                f"=((({col_total_rent}{i}+{col_posting}{i})*{col_ag_comm_pct}{i})+{col_total_rent}{i}+{col_posting}{i})*0.03"
+            )
+
+            # Total Cost = Adv. taxe % + Agency commission + Posting + Production + Total rent
+            # (Kept exactly as in your original logic)
+            worksheet[f"{col_total_cost}{i}"].value = (
+                f"={col_adv_tax_pct}{i}+{col_ag_comm}{i}+{col_posting}{i}+{col_production}{i}+{col_total_rent}{i}"
+            )
+
+            # No. of months (kept your Excel formula, but with dynamic letters)
+            worksheet[f"{col_no_months}{i}"].value = (
+                f'=IF(OR({col_start}{i}="", {col_end}{i}="", {col_start}{i}>{col_end}{i}), "", '
+                f'ROUND((DAY(EOMONTH({col_start}{i},0))-DAY({col_start}{i})+1)/DAY(EOMONTH({col_start}{i},0)) + '
+                f'IF(AND(YEAR({col_start}{i})=YEAR({col_end}{i}), MONTH({col_start}{i})=MONTH({col_end}{i})), 0, '
+                f'DATEDIF(EOMONTH({col_start}{i},0)+1, DATE(YEAR({col_end}{i}), MONTH({col_end}{i}), 1), "m")) + '
+                f'DAY({col_end}{i})/DAY(EOMONTH({col_end}{i},0)), 2))'
+            )
+
+        # --- Number formats (run ONCE, outside the row loop) ---
+        # Currency columns:
+        currency_cols = [
+            "Rent/month", "Total rent", "Production", "Posting",
+            "Agency commission", "Advertising taxe", "Total Cost"
+        ]
+        currency_letters = [header_to_letter[c] for c in currency_cols if c in header_to_letter]
+
+        for col_letter in currency_letters:
+            for r in range(start_row, last_row + 1):
+                cell = worksheet[f"{col_letter}{r}"]
+                if cell.value is not None:
                     cell.number_format = '€#,##0.00'
-        # --- 3) apply Percentage % formatting to columns 
-            cols_to_format_to_percentage = [19, 21] #Ag Comm% and Advertising taxe %
-            for row in range(start_row, worksheet.max_row + 1):
-                for col in cols_to_format_to_percentage:
-                    cell = worksheet.cell(row=row, column=col)
-                    # optional: skip totally-empty cells
-                    if cell.value is None:
-                        continue
-                    # set euro number format even if the cell currently contains a formula string
+
+        # Percentage columns:
+        pct_cols = ["Ag Comm %", "Advertising taxe %"]
+        pct_letters = [header_to_letter[c] for c in pct_cols if c in header_to_letter]
+
+        for col_letter in pct_letters:
+            for r in range(start_row, last_row + 1):
+                cell = worksheet[f"{col_letter}{r}"]
+                if cell.value is not None:
                     cell.number_format = '0.00%'
 
         # --- Styles ---
@@ -112,21 +172,20 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
 
         special_columns = {
             "idx", "NUME FURNIZOR", "CHIRIE FURNIZOR",
-             "COST PRODUCTIE", "TIP MATERIAL", "POSTARE FURNIZOR", "__source_file"
+            "COST PRODUCTIE", "TIP MATERIAL", "POSTARE FURNIZOR", "__source_file"
         }
 
         max_col_width = 40
-        last_col_letter = get_column_letter(len(df.columns))
 
         # --- Title Row ---
         worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2)
-        cell = worksheet.cell(row=1, column=1)
-        cell.value = "MP OOH CAMPAIGN"
-        cell.font = title_font   
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border  # border for A1:B1
+        c_title = worksheet.cell(row=1, column=1)
+        c_title.value = "MP OOH CAMPAIGN"
+        c_title.font = title_font
+        c_title.alignment = Alignment(horizontal="center", vertical="center")
+        c_title.border = thin_border  # border for A1:B1
 
-        # --- Metadata Rows (A2:B6) ---
+        # --- Metadata Rows (A2:B7) ---
         meta_fields = ["Client", "Brand", "Campaign", "Version", "Start", "End"]
         for i, field in enumerate(meta_fields, start=2):
             c1 = worksheet.cell(row=i, column=1, value=field)
@@ -137,19 +196,22 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             c2.border = thin_border
 
         # --- Determine hyperlink columns dynamically ---
-        hyperlink_columns = [col for col in df.columns if any(k in col.lower() for k in ["photo", "link", "address", "tech details"])]
+        hyperlink_columns = [
+            col for col in df.columns
+            if any(k in col.lower() for k in ["photo", "link", "address", "tech details"])
+        ]
 
-        # --- Format DataFrame area ---
+        # --- Format DataFrame area (headers + body) ---
         for col_num, col_name in enumerate(df.columns, 1):
             col_letter = get_column_letter(col_num)
             for row_idx, cell in enumerate(worksheet[col_letter], start=1):
 
-                # Rows 1–9, columns C→last column: untouched (no font, no fill, no border)
+                # Rows 1–9, columns C→last column: untouched
                 if 1 <= row_idx <= 9 and col_num >= 3:
                     continue
 
                 # Header row
-                if row_idx == 10:
+                if row_idx == HEADER_ROW:
                     if col_name in special_columns:
                         cell.fill = yellow_fill
                         cell.font = header_font_red
@@ -161,7 +223,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
                     worksheet.row_dimensions[cell.row].height = 35
 
                 # Body rows
-                elif row_idx > 10:
+                elif row_idx > HEADER_ROW:
                     if col_name in hyperlink_columns and cell.value:
                         link = str(cell.value).strip()
                         if link.lower().startswith(("http://", "https://", "www.")):
@@ -189,7 +251,6 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             # Auto column width
             max_length = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2
             worksheet.column_dimensions[col_letter].width = min(max_length, max_col_width)
-            
 
     output_buffer.seek(0)
     return output_buffer

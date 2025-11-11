@@ -117,7 +117,7 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
             # Total Cost = Adv. taxe % + Agency commission + Posting + Production + Total rent
             # (Kept exactly as in your original logic)
             worksheet[f"{col_total_cost}{i}"].value = (
-                f"={col_adv_tax_pct}{i}+{col_ag_comm}{i}+{col_posting}{i}+{col_production}{i}+{col_total_rent}{i}"
+                f"={col_adv_tax}{i}+{col_ag_comm}{i}+{col_posting}{i}+{col_production}{i}+{col_total_rent}{i}"
             )
 
             # No. of months (kept your Excel formula, but with dynamic letters)

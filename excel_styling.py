@@ -123,12 +123,16 @@ def style_and_export_excel(df: pd.DataFrame, metadata: dict) -> io.BytesIO:
 
             # No. of months (kept your Excel formula, but with dynamic letters)
             worksheet[f"{col_no_months}{i}"].value = (
-                f'=IF(OR({col_start}{i}="", {col_end}{i}="", {col_start}{i}>{col_end}{i}), "", '
-                f'ROUND((DAY(EOMONTH({col_start}{i},0))-DAY({col_start}{i})+1)/DAY(EOMONTH({col_start}{i},0)) + '
-                f'IF(AND(YEAR({col_start}{i})=YEAR({col_end}{i}), MONTH({col_start}{i})=MONTH({col_end}{i})), 0, '
-                f'DATEDIF(EOMONTH({col_start}{i},0)+1, DATE(YEAR({col_end}{i}), MONTH({col_end}{i}), 1), "m")) + '
-                f'DAY({col_end}{i})/DAY(EOMONTH({col_end}{i},0)), 2))'
-            )
+                    f'=IF(OR({col_start}{i}="", {col_end}{i}="", {col_start}{i}>{col_end}{i}), "", '
+                    f'ROUND('
+                        f'IF(AND(YEAR({col_start}{i})=YEAR({col_end}{i}), MONTH({col_start}{i})=MONTH({col_end}{i})), '
+                            f'(DAY({col_end}{i})-DAY({col_start}{i})+1)/DAY(EOMONTH({col_start}{i},0)), '
+                            f'(DAY(EOMONTH({col_start}{i},0))-DAY({col_start}{i})+1)/DAY(EOMONTH({col_start}{i},0)) + '
+                            f'DATEDIF(EOMONTH({col_start}{i},0)+1, DATE(YEAR({col_end}{i}), MONTH({col_end}{i}), 1), "m") + '
+                            f'DAY({col_end}{i})/DAY(EOMONTH({col_end}{i},0))'
+                        f')'
+                    f', 2))'
+                )
 
         # --- Number formats (run ONCE, outside the row loop) ---
         # Currency columns:
